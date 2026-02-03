@@ -1,0 +1,92 @@
+[
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/collisionSystem.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/collisionSystem.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/collisionSystem.cpp",
+  "output": "CMakeFiles/game.dir/src/collisionSystem.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/core/audio.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/audio.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/audio.cpp",
+  "output": "CMakeFiles/game.dir/src/core/audio.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/core/file.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/file.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/file.cpp",
+  "output": "CMakeFiles/game.dir/src/core/file.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/core/input_system.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/input_system.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/input_system.cpp",
+  "output": "CMakeFiles/game.dir/src/core/input_system.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/core/resource.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/resource.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/resource.cpp",
+  "output": "CMakeFiles/game.dir/src/core/resource.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/core/window.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/window.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/core/window.cpp",
+  "output": "CMakeFiles/game.dir/src/core/window.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/game.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/game.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/game.cpp",
+  "output": "CMakeFiles/game.dir/src/game.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/luaPlus.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/luaPlus.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/luaPlus.cpp",
+  "output": "CMakeFiles/game.dir/src/luaPlus.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/main.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/main.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/main.cpp",
+  "output": "CMakeFiles/game.dir/src/main.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/renderer/api.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/api.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/api.cpp",
+  "output": "CMakeFiles/game.dir/src/renderer/api.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/renderer/font_system.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/font_system.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/font_system.cpp",
+  "output": "CMakeFiles/game.dir/src/renderer/font_system.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/renderer/helper.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/helper.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/helper.cpp",
+  "output": "CMakeFiles/game.dir/src/renderer/helper.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/renderer/render_system.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/render_system.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/render_system.cpp",
+  "output": "CMakeFiles/game.dir/src/renderer/render_system.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/c++  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -std=gnu++17 -Wall -g -o CMakeFiles/game.dir/src/renderer/shader.cpp.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/shader.cpp",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/renderer/shader.cpp",
+  "output": "CMakeFiles/game.dir/src/renderer/shader.cpp.o"
+},
+{
+  "directory": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial",
+  "command": "/usr/bin/cc  -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/include -I/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src -g -Wall -g -o CMakeFiles/game.dir/src/glad.c.o -c /home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/glad.c",
+  "file": "/home/nguyenha/Documents/GitHub/SDL2-Tutorial/src/glad.c",
+  "output": "CMakeFiles/game.dir/src/glad.c.o"
+}
+]
