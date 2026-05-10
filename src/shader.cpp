@@ -1,6 +1,5 @@
 #include "shader.h"
 #include "unordered_map"
-#include "render_system.h"
 
 Shader shader;
 std::unordered_map<std::string,unsigned int> shaderCache;

@@ -1,8 +1,11 @@
 #include "game.h"
-#include "luaAPI.h"
+#include "lua_API.h"
+#include "renderer.h"
 
 namespace Game{
     unsigned int id;
+
+float runTime = 0.0;
 
 void load()
 {
@@ -12,8 +15,10 @@ void load()
 
 void update(float deltaTime)
 {
+    runTime += deltaTime;
     Lua::update(deltaTime);
     Lua::draw();
+    Render::setTime(runTime);
 }
 
 }

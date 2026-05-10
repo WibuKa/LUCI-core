@@ -1,7 +1,7 @@
 #include "resource.h"
 #include "file.h"
-#include "renderer_api.h"
-#include "core/audio.h"
+#include "renderer.h"
+#include "audio.h"
 
 namespace Resource
 {

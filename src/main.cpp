@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include "core/window.h"
-#include "core/audio.h"
+#include "audio.h"
 #include "core/input_system.h"
 #include "game.h"
 #include "version.h"
@@ -45,7 +45,7 @@ int main() {
         glfwSwapBuffers(Window::window);
     }
     // Clean Up
-    ma_engine_uninit(&Audio::engine);
+    Audio::close();
     Window::close();
     return 0;
 }

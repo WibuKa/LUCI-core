@@ -1,7 +1,5 @@
-#include <string>
-
 namespace ShaderArc{
-std::string fragment_default_shader = R"(
+constexpr const char* fragment_default_shader = R"(
     #version 330 core
     out vec4 FragColor;
     in vec2 TexCoord;
@@ -10,19 +8,17 @@ std::string fragment_default_shader = R"(
     uniform vec4 uColor;
 
     uniform vec2 uTextureSize;
-    uniform vec2 uFrameOffset;
-    uniform vec2 uFrameSize;
+    uniform vec4 uRegion;
 
     void main()
     {
-        vec2 frameUV = TexCoord * uFrameSize/uTextureSize + uFrameOffset/uTextureSize;
-
-        FragColor = texture(uTexture, frameUV) * uColor;
+        vec2 UV = TexCoord * uRegion.zw/uTextureSize + uRegion.xy/uTextureSize;
+        FragColor = texture(uTexture, UV) * uColor;
     }
 
 )";
 
-std::string fragment_font_default_shader = R"(
+constexpr const char* fragment_font_default_shader = R"(
     #version 330 core
     out vec4 FragColor;
     in vec2 TexCoord;
@@ -44,41 +40,83 @@ std::string fragment_font_default_shader = R"(
     }
 )";
 
-std::string fragment_geometry_shader = R"(
-    #version 330 core
+constexpr const char* fragment_geometry_shader = R"(
+#version 330 core
+
     out vec4 FragColor;
     in vec2 TexCoord;
 
     uniform vec2 uTextureSize;
-    uniform int geometry;
     uniform vec4 uColor;
+    uniform int geometry;
+    float lineWidth = 1.0;
 
-    vec4 color;
-    void lineBox(){
-        vec2 uv = TexCoord * uTextureSize + vec2(0,0.1);
-        float line = 1.0;
-
-        bool borderX = (uv.x < line) || (uv.x > uTextureSize.x - line);
-        bool borderY = (uv.y < line) || (uv.y > uTextureSize.y - line);    
-        if (borderX || borderY)
-            color = uColor;
-        else
-            color = vec4(0.0, 0.0, 0.0, 0.0);
+    void filledBox()
+    {
+        FragColor = uColor;
     }
 
-    void main() {
-        if(geometry == 0){
-            color = uColor;
-        }
-        else{
-            lineBox();
-        }
-        FragColor = color;
+    void filledCircle()
+    {
+        vec2 d = TexCoord - vec2(0.5);
+
+        FragColor = (dot(d, d) < 0.25)
+            ? uColor
+            : vec4(0.0);
     }
 
+    void lineBox()
+    {
+        vec2 p = TexCoord * uTextureSize;
+
+        bool left   = p.x < lineWidth;
+        bool right  = p.x > uTextureSize.x - lineWidth;
+
+        bool top    = p.y < lineWidth;
+        bool bottom = p.y > uTextureSize.y - lineWidth;
+
+        FragColor = (left || right || top || bottom)
+            ? uColor
+            : vec4(0.0);
+    }
+
+    void lineCircle()
+    {
+        vec2 d = TexCoord - vec2(0.5);
+
+        float r2 = dot(d, d);
+
+        float outer = 0.25;
+        
+        float innerRadius = 0.5 - (lineWidth / min(uTextureSize.x, uTextureSize.y));
+        float inner = innerRadius * innerRadius;
+
+        FragColor = (r2 < outer && r2 > inner)
+            ? uColor
+            : vec4(0.0);
+    }
+
+    void main()
+    {
+        switch(geometry)
+        {
+            case 0:
+                filledBox();
+                break;
+            case 1:
+                filledCircle();
+                break;
+            case 2:
+                lineBox();
+                break;
+            case 3:
+                lineCircle();
+                break;
+        }
+    }
 )";
 
-std::string vertex_default_shader = R"(
+constexpr const char* vertex_default_shader = R"(
 #version 330 core
 
 layout(location = 0) in vec2 aPos;
@@ -86,10 +124,10 @@ layout(location = 1) in vec2 aUV;
 
 uniform vec2 uResolution;
 uniform vec2 uTextureSize;
-uniform vec2 uFrameSize;
 uniform vec2 uPos;
 uniform vec2 uScale;
 uniform vec2 uView;
+uniform vec4 uRegion;
 uniform float uAngle;
 uniform float uTime;
 
@@ -100,7 +138,7 @@ void main()
     TexCoord = aUV;
 
     // local space
-    vec2 pos = aPos * uFrameSize * uScale;
+    vec2 pos = aPos * uRegion.zw * uScale;
 
     // rotation
     float c = cos(uAngle);

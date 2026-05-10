@@ -1,6 +1,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "font.h"
-#include "render_system.h"
+#include "renderer.h"
 #include <fstream>
 #include <vector>
 #include <cstdint>
@@ -159,7 +159,7 @@ int load_font(const std::string& fontFile,float fontSize)
     stbtt_PackEnd(&ctx);
 
     GLuint textureID;
-    textureID = RenderSYS::createTexture_data(fontAtlasTextureData,fontAtlasWidth,fontAtlasHeight,1,-1,-1);
+    textureID = Render::createTexture_data(fontAtlasTextureData,fontAtlasWidth,fontAtlasHeight,1,-1,-1);
     float line_height = fontSize;
 
     Font f;
