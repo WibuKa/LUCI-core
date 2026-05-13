@@ -1,11 +1,12 @@
-#include <cstdio>
 #define STB_IMAGE_IMPLEMENTATION
+#include <cstdio>
 #include <stb/stb_image.h>
 #include "renderer.h"
 #include "shader_archive.h"
 #include "font.h"
 #include "helper.h"
 #include "file.h"
+#include "color.h"
 #include <iostream>
 
 GLFWwindow* window;
@@ -33,6 +34,7 @@ unsigned int shader_target = 3;
 GLuint font_default_id;
 GLuint font_id;
 
+Color currentColor    = {1.0, 1.0, 1.0, 1.0};
 GLuint currentShader  = 0;
 GLuint currentTexture = 0;
 GLuint defaultShader  = 0;
@@ -113,13 +115,15 @@ void init(GLFWwindow* glwd) {
     
     shaders.assign({spriteShader, geometryShader, fontShader});
     
-    setColor(1.0, 1.0, 1.0, 1.0);
+    currentColor = {1.0, 1.0, 1.0, 1.0};
+    setColor(currentColor.r, currentColor.g, currentColor.b, currentColor.a);
     font_default_id = FontSYS::load_font("FVF Fernando 08.ttf", 15);
     font_id = font_default_id;
     defaultShader = spriteShader;
 }
 
 void setColor(float r, float g, float b, float a) {
+    currentColor = {r, g, b, a};
     for (GLuint &shader : shaders) {
         useShader(shader);
         setUniformVec4(shader, "uColor",r, g, b, a);
@@ -344,6 +348,8 @@ unsigned int loadShader(std::string shader_Path) {
     GLuint program = createShader(vertex_default, fragID);
     glDeleteShader(fragID);
     shaders.push_back(program);
+    useShader(program);
+    setUniformVec4(program, "uColor", currentColor.r, currentColor.g, currentColor.b, currentColor.a);
     return result;
 }
 

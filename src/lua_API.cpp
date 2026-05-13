@@ -1,12 +1,12 @@
 #include "lua_API.h"
 #include "core/input_system.h"
-#include "core/resource.h"
 #include "renderer.h"
-#include "core/window.h"
+#include "window.h"
 #include "audio.h"
 #include "sol/table.hpp"
 #include "texture.h"
 #include "texture_region.h"
+#include "loader.h"
 
 namespace Lua{
     sol::state lua;
@@ -17,6 +17,7 @@ namespace Lua{
     sol::table luci     = lua.create_table();
     sol::table window   = lua.create_table();
     sol::table texture  = lua.create_table();
+    sol::table audio    = lua.create_table();
     sol::table graphics = lua.create_table();
     sol::table assets   = lua.create_table();
 
@@ -26,12 +27,22 @@ namespace Lua{
         luci["texture"]   = texture;
         luci["assets"]    = assets;
         luci["graphics"]  = graphics;
+        luci["audio"]     = audio;
         lua["luci"]       = luci;
 
         luci.set_function("clear_color",[](float r,float g, float b){glClearColor(r, g, b, 1.0);});
         window.set_function("set", &Window::set_window);
         window.set_function("resizable", &Window::set_resizable);
         window.set_function("fullscreen", &Window::fullscreen);
+    }
+
+    void loader_API()
+    {
+        assets.set_function("new_region",&new_texture_region);
+        assets.set_function("load_image",&load_texture);
+        assets.set_function("load_shader",&Render::loadShader);
+        assets.set_function("load_sound",&Loader::load_sound);   
+        assets.set_function("load_music",&Loader::load_stream);
     }
 
     void draw_API()
@@ -56,10 +67,6 @@ namespace Lua{
             "set_region", &TextureRegion::set_region
         );
 
-        assets.set_function("new_region",&new_texture_region);
-        assets.set_function("load_image",&load_texture);
-        assets.set_function("load_shader",&Render::loadShader);
-        
         graphics.set_function("draw_sprite",&Render::draw_sprite);
         graphics.set_function("draw_rectangle",&Render::draw_rectangle);
         graphics.set_function("draw_circle",&Render::drawCircle);
@@ -85,8 +92,9 @@ namespace Lua{
 
     void audio_API()
     {
-        sol::table audio = lua.create_table();
-        lua["audio"]     = audio;
+        lua.new_usertype<Sound>("Sound",
+            "type", &Sound::type
+        );
         audio.set_function("play",&Audio::play);
         audio.set_function("loop",&Audio::loop);
     }
@@ -96,12 +104,10 @@ namespace Lua{
         lua.open_libraries(sol::lib::base, sol::lib::package,sol::lib::string,sol::lib::utf8,sol::lib::table, sol::lib::math);
 
         luci_API();
-        draw_API();
+        loader_API();
         input_API();
+        draw_API();
         audio_API();
-
-
-        lua.set_function("preload",&Resource::load);
 
         lua.script_file("main.lua");
 

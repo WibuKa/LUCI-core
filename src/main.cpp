@@ -2,7 +2,7 @@
 #include <glad/glad.h> 
 #include <GLFW/glfw3.h>
 
-#include "core/window.h"
+#include "window.h"
 #include "audio.h"
 #include "core/input_system.h"
 #include "game.h"

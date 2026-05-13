@@ -1,11 +1,12 @@
 #pragma once
 #include <miniaudio.h>
-#include <string>
+#include "sound.h"
 
 namespace Audio{
+    extern ma_engine engine;
     void init();
-    unsigned int get_sound_id(std::string path);
-    void loop(unsigned int id, float volum, float pitch);
-    void play(unsigned int id, float volum, float pitch);
+    void loop(Sound sound, float volum, float pitch);
+    void play(Sound& sound, float volum, float pitch);
+    void emitSound(Sound& sound, float volum, float pitch);
     void close(); 
 }

@@ -1,8 +1,0 @@
-*.exe
-.vscode/
-.cache/
-sample/
-build/
-OBJ/
-CMakeFiles/
-CMakeCache.txt
