@@ -30,6 +30,7 @@ std::vector<GLuint> shaders;
 unsigned int targetShader = 3;
 unsigned int spriteShader;
 unsigned int geometryShader;
+unsigned int patchShader;
 unsigned int fontShader;
 unsigned int tilemapShader;
 unsigned int fontTexture;
@@ -181,8 +182,12 @@ void init(GLFWwindow* glwd) {
     fagID = genShader(GL_FRAGMENT_SHADER, ShaderArc::fragment_font_default_shader);
     fontShader = createShader(vertex_default, fagID);
     glDeleteShader(fagID);
+
+    fagID = genShader(GL_FRAGMENT_SHADER, ShaderArc::fragment_patch_shader);
+    patchShader = createShader(genShader(GL_VERTEX_SHADER, ShaderArc::vertex_patch_shader), fagID);
+    glDeleteShader(fagID);
     
-    shaders.assign({spriteShader, geometryShader, fontShader});
+    shaders.assign({spriteShader, geometryShader, fontShader, patchShader});
     
     currentColor = {1.0, 1.0, 1.0, 1.0};
     setColor(currentColor.r, currentColor.g, currentColor.b, currentColor.a);
@@ -414,6 +419,14 @@ void useShader(unsigned int id) {
     if (currentShader == id) return;
     currentShader = id;
     glUseProgram(id);
+    flush();
+}
+
+void useTexture(unsigned int id) {
+    if (currentTexture == id) return;
+    currentTexture = id;
+    glBindTexture(GL_TEXTURE_2D, id);
+    flush();
 }
 
 void pushShaderID(unsigned int ShaderID) {
@@ -494,21 +507,25 @@ Quad makeQuad(float cx, float cy, float w, float h, float angle) {
     return q;
 }
 
-void submitSprite(GLuint textureID, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle)
+void submitSprite(GLuint textureID, GLuint shader, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle)
 {
     if (textureID != currentTexture) flush();
+    useShader(shader);
     currentTexture = textureID;
 
     Quad q = makeQuad(x, y, ow * scale_x, oh * scale_y, angle);
     
     float u0 = ox / tw;
     float v0 = oy / th;
+
     float u1 = (ox + ow) / tw;
-    float v1 = (oy + oh) / th;
+    float v1 = oy / th;
+
     float u2 = (ox + ow) / tw;
     float v2 = (oy + oh) / th;
+
     float u3 = ox / tw;
-    float v3 = oy / th;
+    float v3 = (oy + oh) / th;
 
     Vertex ver0 = {q.x0, q.y0, u0, v0, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex ver1 = {q.x1, q.y1, u1, v1, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
@@ -660,9 +677,12 @@ void draw_sprite(TextureRegion& texture_region, float x, float y, float angle, f
 }
 
 void draw_rectangle(float x, float y, float w, float h, bool fill) {
-    useShader(geometryShader);
-    setUniformInt(geometryShader, "geometry", fill ? 0 : 2);
-    submitSprite(0, x, y, w, h, 0, 0, w, h, 1, 1, 0);
+    //useShader(geometryShader);
+    //setUniformInt(geometryShader, "geometry", fill ? 0 : 2);
+    useShader(patchShader);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    setUniformVec2(patchShader, "uResolution", windowWidth, windowHeight);
+    submitSprite(0,patchShader, x, y, w, h, 0, 0, w, h, 1, 1, 0.785398f);
     flush();
     //draw(0, x, y, w, h, 0, 0, w, h, 1, 1, 0, 6, VAO_default);
 }

@@ -116,6 +116,9 @@ constexpr const char* fragment_geometry_shader = R"(
     }
 )";
 
+
+
+
 constexpr const char* vertex_default_shader = R"(
 #version 330 core
 
@@ -151,6 +154,46 @@ void main()
     clipPos.y = -clipPos.y;
 
     gl_Position = vec4(clipPos,0.0, 1.0);
+}
+)";
+
+constexpr const char* fragment_patch_shader = R"(
+#version 330 core
+
+in vec2 vUV;
+in vec4 vColor;
+
+out vec4 FragColor;
+
+void main()
+{
+    FragColor = vColor;
+}
+)";
+
+constexpr const char* vertex_patch_shader = R"(
+#version 330 core
+
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in vec2 aUV;
+layout(location = 2) in vec4 aColor;
+
+out vec2 vUV;
+out vec4 vColor;
+
+uniform vec2 uResolution;
+
+void main()
+{
+    vec2 pos = aPos;
+
+    pos.x = (pos.x / uResolution.x) * 2.0 - 1.0;
+    pos.y = 1.0 - (pos.y / uResolution.y) * 2.0;
+
+    gl_Position = vec4(pos, 0.0, 1.0);
+
+    vUV = aUV;
+    vColor = aColor;
 }
 )";
 }

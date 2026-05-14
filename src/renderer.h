@@ -69,8 +69,12 @@ namespace Render {
 
     void beginBatch();
     void endBatch();
-    void submitSprite(GLuint textureID, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle);
-
+    void submitSprite(
+        GLuint textureID, GLuint shader, 
+        float x, float y, float tw, float th,
+        float ox, float oy, float ow, float oh, 
+        float scale_x, float scale_y, float angle
+    );
     void flush();
     //--------------------------------------------------- draw -------------------------------------------------------//
     void draw(GLuint textureID, float x, float y, float tw, float th,int ox, int oy, int ow, int oh, float scale_x, float scale_y,
