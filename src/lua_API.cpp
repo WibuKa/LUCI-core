@@ -40,6 +40,7 @@ namespace Lua{
     {
         assets.set_function("new_region",&new_texture_region);
         assets.set_function("load_image",&load_texture);
+        assets.set_function("clone_audio",&Loader::cloneSound);
         assets.set_function("load_shader",&Render::loadShader);
         assets.set_function("load_sound",&Loader::load_sound);   
         assets.set_function("load_music",&Loader::load_stream);
@@ -93,10 +94,18 @@ namespace Lua{
     void audio_API()
     {
         lua.new_usertype<Sound>("Sound",
-            "type", &Sound::type
+            "type", &Sound::type,
+            "set_volume", &Sound::setVolume,
+            "get_volume", &Sound::getVolume,
+            "set_pitch", &Sound::setPitch,
+            "get_pitch", &Sound::getPitch,
+            "set_looping", &Sound::setLooping,
+            "get_looping", &Sound::getLooping
         );
         audio.set_function("play",&Audio::play);
-        audio.set_function("loop",&Audio::loop);
+        audio.set_function("pause",&Audio::pause);
+        audio.set_function("stop",&Audio::stop);
+        audio.set_function("emit_sound",&Audio::emitSound);
     }
     
     void create()

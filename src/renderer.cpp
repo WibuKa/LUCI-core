@@ -9,6 +9,10 @@
 #include "color.h"
 #include <iostream>
 
+constexpr int MAX_SPRITES  = 5000;
+constexpr int MAX_VERTICES = MAX_SPRITES * 4;
+constexpr int MAX_INDICES  = MAX_SPRITES * 6;
+
 GLFWwindow* window;
 float runTime;
 float zoom = 1.0f;
@@ -52,10 +56,6 @@ float vertices[] = {
 
 unsigned int indices[] = { 0, 1, 3, 1, 2, 3 };
 
-struct Vertex {
-    float x,y,u,v;
-};
-
 struct View
 {
     float x = 0;
@@ -73,10 +73,79 @@ int windowWidth, windowHeight;
 GLuint genShader(GLenum type,const char* shaderCode);
 unsigned int createShader(unsigned int ver, unsigned int frag);
 
-void init(GLFWwindow* glwd) {
-    window = glwd;
-    glfwGetWindowSize(window, &windowWidth, &windowHeight);
+std::vector<Vertex> batchVertices;
+std::vector<unsigned int> batchIndices;
 
+bool batching = false;
+
+GLuint batchVAO;
+GLuint batchVBO;
+GLuint batchEBO;
+
+void init(GLFWwindow* glwd) {
+    // --------------------------------  window  -------------------------------- //
+    glfwGetWindowSize(glwd, &windowWidth, &windowHeight);
+    
+    // -------------------------------- batching -------------------------------- //
+    glGenVertexArrays(1, &batchVAO);
+    glGenBuffers(1, &batchVBO);
+    glGenBuffers(1, &batchEBO);
+
+    glBindVertexArray(batchVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, batchVBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, batchEBO);
+
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        MAX_VERTICES * sizeof(Vertex),
+        nullptr,
+        GL_DYNAMIC_DRAW
+    );
+
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        MAX_INDICES * sizeof(unsigned int),
+        nullptr,
+        GL_DYNAMIC_DRAW
+    );
+
+    // position
+    glVertexAttribPointer(
+        0,
+        2,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(Vertex),
+        (void*)0
+    );
+    glEnableVertexAttribArray(0);
+
+    // UV
+    glVertexAttribPointer(
+        1,
+        2,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(Vertex),
+        (void*)(2 * sizeof(float))
+    );
+    glEnableVertexAttribArray(1);
+
+    // color
+    glVertexAttribPointer(
+        2,
+        4,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(Vertex),
+        (void*)(4 * sizeof(float))
+    );
+    glEnableVertexAttribArray(2);
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
+    // ------------------------------------------------------------------------------ //
     GLuint VBO, EBO;
     glGenBuffers(1, &EBO);
 
@@ -120,6 +189,16 @@ void init(GLFWwindow* glwd) {
     font_default_id = FontSYS::load_font("FVF Fernando 08.ttf", 15);
     font_id = font_default_id;
     defaultShader = spriteShader;
+}
+
+void beginBatch()
+{
+    batching = true;
+}
+
+void endBatch()
+{
+    batching = false;
 }
 
 void setColor(float r, float g, float b, float a) {
@@ -353,8 +432,8 @@ unsigned int loadShader(std::string shader_Path) {
     return result;
 }
 
-void draw(GLuint textureID, float x, float y, float tw, float th,int ox, int oy, int ow, int oh, float scale_x, float scale_y, float angle, GLuint vertexCount, GLuint VAO) {
-
+void draw(GLuint textureID, float x, float y, float tw, float th,int ox, int oy, int ow, int oh, float scale_x, float scale_y, float angle, GLuint vertexCount, GLuint VAO) 
+{
     glBindTexture(GL_TEXTURE_2D, textureID);
     glBindVertexArray(VAO);
 
@@ -371,6 +450,123 @@ void draw(GLuint textureID, float x, float y, float tw, float th,int ox, int oy,
     
     glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
 
+}
+
+Quad makeQuad(float cx, float cy, float w, float h, float angle) {
+    float hw = w  * 0.5f;
+    float hh = h * 0.5f;
+
+    // local vertices
+    float lx0 = -hw;
+    float ly0 = -hh;
+
+    float lx1 =  hw;
+    float ly1 = -hh;
+
+    float lx2 =  hw;
+    float ly2 =  hh;
+
+    float lx3 = -hw;
+    float ly3 =  hh;
+
+    // rotation
+    float c = cos(angle);
+    float s = sin(angle);
+
+    Quad q;
+
+    // vertex 0
+    q.x0 = lx0 * c - ly0 * s + cx;
+    q.y0 = lx0 * s + ly0 * c + cy;
+
+    // vertex 1
+    q.x1 = lx1 * c - ly1 * s + cx;
+    q.y1 = lx1 * s + ly1 * c + cy;
+
+    // vertex 2
+    q.x2 = lx2 * c - ly2 * s + cx;
+    q.y2 = lx2 * s + ly2 * c + cy;
+
+    // vertex 3
+    q.x3 = lx3 * c - ly3 * s + cx;
+    q.y3 = lx3 * s + ly3 * c + cy;
+
+    return q;
+}
+
+void submitSprite(GLuint textureID, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle)
+{
+    if (textureID != currentTexture) flush();
+    currentTexture = textureID;
+
+    Quad q = makeQuad(x, y, ow * scale_x, oh * scale_y, angle);
+    
+    float u0 = ox / tw;
+    float v0 = oy / th;
+    float u1 = (ox + ow) / tw;
+    float v1 = (oy + oh) / th;
+    float u2 = (ox + ow) / tw;
+    float v2 = (oy + oh) / th;
+    float u3 = ox / tw;
+    float v3 = oy / th;
+
+    Vertex ver0 = {q.x0, q.y0, u0, v0, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
+    Vertex ver1 = {q.x1, q.y1, u1, v1, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
+    Vertex ver2 = {q.x2, q.y2, u2, v2, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
+    Vertex ver3 = {q.x3, q.y3, u3, v3, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
+
+    unsigned int index = batchVertices.size();
+    batchIndices.push_back(0 + index);
+    batchIndices.push_back(1 + index);
+    batchIndices.push_back(3 + index);
+    batchIndices.push_back(1 + index);
+    batchIndices.push_back(2 + index);
+    batchIndices.push_back(3 + index);
+
+    batchVertices.push_back(ver0);
+    batchVertices.push_back(ver1);
+    batchVertices.push_back(ver2);
+    batchVertices.push_back(ver3);
+}
+
+void flush()
+{
+    if(batchVertices.empty())
+        return;
+
+    glBindVertexArray(batchVAO);
+    
+    glBindTexture(GL_TEXTURE_2D, currentTexture);
+
+    glBindBuffer(GL_ARRAY_BUFFER, batchVBO);
+
+    glBufferSubData(
+        GL_ARRAY_BUFFER,
+        0,
+        batchVertices.size() * sizeof(Vertex),
+        batchVertices.data()
+    );
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, batchEBO);
+
+    glBufferSubData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        0,
+        batchIndices.size() * sizeof(unsigned int),
+        batchIndices.data()
+    );
+
+    glDrawElements(
+        GL_TRIANGLES,
+        batchIndices.size(),
+        GL_UNSIGNED_INT,
+        0
+    );
+
+    batchVertices.clear();
+    batchIndices.clear();
+
+    glBindVertexArray(0);
 }
 
 void loadFragmentShaderSource(std::string path) {
@@ -466,7 +662,9 @@ void draw_sprite(TextureRegion& texture_region, float x, float y, float angle, f
 void draw_rectangle(float x, float y, float w, float h, bool fill) {
     useShader(geometryShader);
     setUniformInt(geometryShader, "geometry", fill ? 0 : 2);
-    draw(0, x, y, w, h, 0, 0, w, h, 1, 1, 0, 6, VAO_default);
+    submitSprite(0, x, y, w, h, 0, 0, w, h, 1, 1, 0);
+    flush();
+    //draw(0, x, y, w, h, 0, 0, w, h, 1, 1, 0, 6, VAO_default);
 }
 
 

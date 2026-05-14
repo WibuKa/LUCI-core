@@ -3,6 +3,7 @@
 #include "sound.h"
 
 namespace Loader {
+    Sound cloneSound(Sound& sound);
     Sound load_sound(std::string path);
     Sound load_stream(std::string path);
 }

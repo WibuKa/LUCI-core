@@ -30,15 +30,24 @@ namespace Audio{
         }
     }
 
-    void play(Sound& sound, float volum, float pitch)
+    void play(Sound& sound)
     {
-        ma_sound_set_volume(sound.get(),volum);
-        ma_sound_set_pitch(sound.get(),pitch);
+        if(ma_sound_is_playing(sound.get()))ma_sound_seek_to_pcm_frame(sound.get(), 0);
         ma_sound_start(sound.get());
     }
 
+    void stop(Sound& sound)
+    {
+        ma_sound_seek_to_pcm_frame(sound.get(), 0);
+        ma_sound_stop(sound.get());
+    }
 
-    void emitSound(Sound& sound, float volum, float pitch)
+    void pause(Sound& sound)
+    {
+        ma_sound_stop(sound.get());
+    }
+
+    void emitSound(Sound& sound)
     {
         if(sound.isStream()){
             printf("Cannot emit music\n");
@@ -50,8 +59,8 @@ namespace Audio{
             printf("Failed to play sound\n");
             return;
         }
-        ma_sound_set_volume(clone.get(),volum);
-        ma_sound_set_pitch(clone.get(),pitch);
+        ma_sound_set_volume(clone.get(),sound.getVolume());
+        ma_sound_set_pitch(clone.get(),sound.getPitch());
         ma_sound_start(clone.get());
         sound_clones.push_back(std::move(clone));
         cleanUpClones();

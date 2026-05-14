@@ -5,8 +5,9 @@
 namespace Audio{
     extern ma_engine engine;
     void init();
-    void loop(Sound sound, float volum, float pitch);
-    void play(Sound& sound, float volum, float pitch);
-    void emitSound(Sound& sound, float volum, float pitch);
+    void play(Sound& sound);
+    void stop(Sound& sound);
+    void pause(Sound& sound);
+    void emitSound(Sound& sound);
     void close(); 
 }

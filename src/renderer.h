@@ -28,6 +28,19 @@ struct Uniform
     float value[4];
 };
 
+struct Vertex {
+    float x, y;
+    float u, v;
+    float r, g, b, a;
+};
+
+struct Quad {
+    float x0, y0;
+    float x1, y1;
+    float x2, y2;
+    float x3, y3;
+};
+
 extern GLuint VAO_default;
 extern std::unordered_map<std::string,unsigned int> pathCache;
 
@@ -54,6 +67,11 @@ namespace Render {
     void createVAOnVBO(GLuint& vao, GLuint& vbo);
     void createTilemapMesh(int ID, const std::vector<int>& tiles, int W, int H, int Row, int Col, int pixelSize);
 
+    void beginBatch();
+    void endBatch();
+    void submitSprite(GLuint textureID, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle);
+
+    void flush();
     //--------------------------------------------------- draw -------------------------------------------------------//
     void draw(GLuint textureID, float x, float y, float tw, float th,int ox, int oy, int ow, int oh, float scale_x, float scale_y,
                                   float angle, GLuint vertexCount, GLuint VAO);
