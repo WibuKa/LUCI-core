@@ -1,5 +1,6 @@
 #include "lua_API.h"
 #include "core/input_system.h"
+#include "lua.h"
 #include "renderer.h"
 #include "window.h"
 #include "audio.h"
@@ -7,6 +8,8 @@
 #include "texture.h"
 #include "texture_region.h"
 #include "loader.h"
+#include <cstdio>
+#include <vector>
 
 namespace Lua{
     sol::state lua;
@@ -51,7 +54,6 @@ namespace Lua{
         lua.set_function("set_view_translate",&Render::setViewTranslate);
         lua.set_function("get_window_size",&Render::getWindowSize);
         lua.set_function("get_texture_size",&Render::getTextureSize);
-        lua.set_function("load_texture",&load_texture);
         lua.set_function("load_font",&Render::load_font);
         lua.set_function("set_font",&Render::set_font);
 
@@ -68,8 +70,8 @@ namespace Lua{
             "set_region", &TextureRegion::set_region
         );
 
-        graphics.set_function("draw_sprite",&Render::draw_sprite);
-        graphics.set_function("draw_rectangle",&Render::draw_rectangle);
+        graphics.set_function("draw_sprite",&Render::drawSprite);
+        graphics.set_function("draw_rectangle",&Render::drawRectangle);
         graphics.set_function("draw_circle",&Render::drawCircle);
         graphics.set_function("set_shader",&Render::setShader);
     }

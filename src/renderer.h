@@ -11,6 +11,12 @@
 #include "texture.h"
 #include "texture_region.h"
 
+#define UNIFORM_INT 1
+#define UNIFORM_FLOAT 2
+#define UNIFORM_VEC2 3
+#define UNIFORM_VEC3 4
+#define UNIFORM_VEC4 5
+
 struct GLFWwindow;
 
 struct RenderTexture
@@ -21,16 +27,18 @@ struct RenderTexture
     int grid_x,grid_y;
 };
 
-struct Uniform
-{
-    std::string name;
-    char type;
-    float value[4];
-};
+
 
 struct Vertex {
     float x, y;
     float u, v;
+    float r, g, b, a;
+};
+
+struct Instance {
+    float x, y;
+    float rot;
+    float sx, sy;
     float r, g, b, a;
 };
 
@@ -41,7 +49,6 @@ struct Quad {
     float x3, y3;
 };
 
-extern GLuint VAO_default;
 extern std::unordered_map<std::string,unsigned int> pathCache;
 
 namespace Render {
@@ -70,24 +77,17 @@ namespace Render {
     void beginBatch();
     void endBatch();
     void submitSprite(
-        GLuint textureID, GLuint shader, 
+        GLuint textureID, 
         float x, float y, float tw, float th,
         float ox, float oy, float ow, float oh, 
         float scale_x, float scale_y, float angle
     );
     void flush();
     //--------------------------------------------------- draw -------------------------------------------------------//
-    void draw(GLuint textureID, float x, float y, float tw, float th,int ox, int oy, int ow, int oh, float scale_x, float scale_y,
-                                  float angle, GLuint vertexCount, GLuint VAO);
-    
-    void add_sprite(unsigned int id, float x, float y, float scale_x = 1.0f, float scale_y = 1.0f, float angle = 0.0f, int frame = 0);
-    void add_quad(float x = 0, float y = 0, float w = 0, float h = 0, float angle = 0);
     void drawText(const std::string& text, float x, float y, const std::string& align);
-    void drawSprite(unsigned int id, float x, float y, float scale_x, float scale_y, float angle, int frame);
-    void drawSquare(float x, float y, float w, float h, bool fill);
     void drawCircle(float x, float y, float r, bool fill);
-    void draw_sprite(TextureRegion& texture_region, float x, float y, float angle, float scale_x, float scale_y);
-    void draw_rectangle(float x, float y, float w, float h, bool fill);
+    void drawSprite(TextureRegion& texture_region, float x, float y, float angle, float scale_x, float scale_y);
+    void drawRectangle(float x, float y, float w, float h, bool fill);
     
     //-------------------------------------------------- shader ------------------------------------------------------//
     unsigned int loadShader(std::string shader_Path);

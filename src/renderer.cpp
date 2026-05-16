@@ -30,7 +30,6 @@ std::vector<GLuint> shaders;
 unsigned int targetShader = 3;
 unsigned int spriteShader;
 unsigned int geometryShader;
-unsigned int patchShader;
 unsigned int fontShader;
 unsigned int tilemapShader;
 unsigned int fontTexture;
@@ -44,18 +43,8 @@ GLuint currentShader  = 0;
 GLuint currentTexture = 0;
 GLuint defaultShader  = 0;
 GLuint currentVAO     = 0;
-GLuint VAO_default;
 
 std::unordered_map<std::string,unsigned int> pathCache;
-
-float vertices[] = {
-    1.0f,  1.0f, 1.0f, 1.0f,
-    1.0f, -1.0f, 1.0f, 0.0f,
-    -1.0f, -1.0f, 0.0f, 0.0f,
-    -1.0f,  1.0f, 0.0f, 1.0f
-};
-
-unsigned int indices[] = { 0, 1, 3, 1, 2, 3 };
 
 struct View
 {
@@ -66,22 +55,39 @@ struct View
     float scale = 1;
 } view;
 
+struct Uniform
+{
+    unsigned int shader;
+    std::string name;
+    int type;
+    float value[4];
+};
+
+struct UniformLocation {
+    GLuint shader;
+    std::string name;
+    GLint location;
+};
+
 namespace Render
 {
 
 int windowWidth, windowHeight;
 
-GLuint genShader(GLenum type,const char* shaderCode);
+GLuint loadShaderCode(GLenum type,const char* shaderCode);
 unsigned int createShader(unsigned int ver, unsigned int frag);
 
 std::vector<Vertex> batchVertices;
-std::vector<unsigned int> batchIndices;
+std::vector<Instance> batchInstances;
 
 bool batching = false;
 
 GLuint batchVAO;
 GLuint batchVBO;
 GLuint batchEBO;
+
+std::vector<Uniform> uniformCache;
+std::vector<UniformLocation> uniformLocationCache;
 
 void init(GLFWwindow* glwd) {
     // --------------------------------  window  -------------------------------- //
@@ -103,11 +109,30 @@ void init(GLFWwindow* glwd) {
         GL_DYNAMIC_DRAW
     );
 
+    std::vector<unsigned int> staticIndices;
+
+    staticIndices.reserve(MAX_INDICES);
+
+    for (unsigned int i = 0; i < MAX_SPRITES; i++)
+    {
+        unsigned int offset = i * 4;
+
+        staticIndices.push_back(offset + 0);
+        staticIndices.push_back(offset + 1);
+        staticIndices.push_back(offset + 3);
+
+        staticIndices.push_back(offset + 1);
+        staticIndices.push_back(offset + 2);
+        staticIndices.push_back(offset + 3);
+    }
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, batchEBO);
+
     glBufferData(
         GL_ELEMENT_ARRAY_BUFFER,
-        MAX_INDICES * sizeof(unsigned int),
-        nullptr,
-        GL_DYNAMIC_DRAW
+        staticIndices.size() * sizeof(unsigned int),
+        staticIndices.data(),
+        GL_STATIC_DRAW
     );
 
     // position
@@ -146,51 +171,31 @@ void init(GLFWwindow* glwd) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
+    batchVertices.reserve(MAX_VERTICES);
+    batchInstances.reserve(MAX_VERTICES);
+
     // ------------------------------------------------------------------------------ //
-    GLuint VBO, EBO;
-    glGenBuffers(1, &EBO);
-
-    createVAOnVBO(VAO_default, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     GLuint fagID;
-    vertex_default = genShader(GL_VERTEX_SHADER, ShaderArc::vertex_default_shader);
+    vertex_default = loadShaderCode(GL_VERTEX_SHADER, ShaderArc::vertex_default_shader);
 
-    fagID = genShader(GL_FRAGMENT_SHADER, ShaderArc::fragment_default_shader);
+    fagID = loadShaderCode(GL_FRAGMENT_SHADER, ShaderArc::fragment_default_shader);
     spriteShader = createShader(vertex_default, fagID);
     glDeleteShader(fagID);
 
-    fagID = genShader(GL_FRAGMENT_SHADER, ShaderArc::fragment_geometry_shader);
+    fagID = loadShaderCode(GL_FRAGMENT_SHADER, ShaderArc::fragment_geometry_shader);
     geometryShader = createShader(vertex_default, fagID);
     glDeleteShader(fagID);
 
-    fagID = genShader(GL_FRAGMENT_SHADER, ShaderArc::fragment_font_default_shader);
+    fagID = loadShaderCode(GL_FRAGMENT_SHADER, ShaderArc::fragment_font_default_shader);
     fontShader = createShader(vertex_default, fagID);
     glDeleteShader(fagID);
 
-    fagID = genShader(GL_FRAGMENT_SHADER, ShaderArc::fragment_patch_shader);
-    patchShader = createShader(genShader(GL_VERTEX_SHADER, ShaderArc::vertex_patch_shader), fagID);
-    glDeleteShader(fagID);
-    
-    shaders.assign({spriteShader, geometryShader, fontShader, patchShader});
+    shaders.assign({spriteShader, geometryShader, fontShader});
     
     currentColor = {1.0, 1.0, 1.0, 1.0};
-    setColor(currentColor.r, currentColor.g, currentColor.b, currentColor.a);
     font_default_id = FontSYS::load_font("FVF Fernando 08.ttf", 15);
     font_id = font_default_id;
     defaultShader = spriteShader;
@@ -208,16 +213,58 @@ void endBatch()
 
 void setColor(float r, float g, float b, float a) {
     currentColor = {r, g, b, a};
-    for (GLuint &shader : shaders) {
-        useShader(shader);
-        setUniformVec4(shader, "uColor",r, g, b, a);
+}
+
+void setCachedUniform(unsigned int shader, std::string name,int type,float x, float y, float z, float w) {
+    for (Uniform &uniform : uniformCache) {
+        if (uniform.name == name && uniform.shader == shader && uniform.type == type) {
+            uniform.value[0] = x;
+            uniform.value[1] = y;
+            uniform.value[2] = z;
+            uniform.value[3] = w;
+            return;
+        }
     }
+    uniformCache.push_back({shader,name,type,x,y,z,w});
+}
+
+GLint getUniformLocation(GLuint shader, const std::string& name)
+{
+    for (const auto& uniform : uniformLocationCache){
+        if (uniform.shader == shader && uniform.name == name){
+            return uniform.location;
+        }
+    }
+    GLint location = glGetUniformLocation(shader, name.c_str());
+    uniformLocationCache.push_back({shader,name,location});
+    return location;
+}
+
+bool hasCachedUniformValue(int shader, std::string name, int type, float x, float y, float z, float w) {
+    for (Uniform &uniform : uniformCache) {
+        if (uniform.name     == name && 
+            uniform.shader   == shader && 
+            uniform.type     == type &&
+            uniform.value[0] == x &&
+            uniform.value[1] == y &&
+            uniform.value[2] == z &&
+            uniform.value[3] == w
+        ) return true;
+    }
+    return false;
+}
+
+bool hasUniform(int shader, std::string name) {
+    if (getUniformLocation(shader, name) == -1) return false;
+    return true;
 }
 
 void setTime(float rt) {
     for (GLuint &shader : shaders) {
-        useShader(shader);
-        setUniformFloat(shader, "uTime",rt);
+        if (hasUniform(shader, "uTime")) {
+            useShader(shader);
+            setUniformFloat(shader, "uTime",rt);
+        }
     }
 }
 
@@ -227,6 +274,10 @@ void resize(int width, int height) {
     glViewport(0, 0, width, height);
     windowWidth  = width;
     windowHeight = height;
+    for (GLuint &shader : shaders) {
+        useShader(shader);
+        setUniformVec2(shader, "uResolution", windowWidth, windowHeight);
+    }
 }
 
 void setZoom(float value) {
@@ -315,63 +366,58 @@ std::tuple<int,int> getTextureSize(unsigned id) {
     return {width, height};
 }
 
-void add_quad(float x, float y, float w, float h, float angle) {
-    glm::vec2 frameSize   = {w, h};
-    glm::vec2 frameOffset = {0, 0};
-    //draw(0, x, y, w, h, 1, 1, angle, frameOffset, frameSize);
-}
-
-void add_sprite(unsigned int id, float x, float y, float scale_x, float scale_y, float angle, int frame) {
-    RenderTexture textureI = textures[id];
-    float w = textureI.width;
-    float h = textureI.height;
-
-    glm::vec2 frameSize = {textureI.grid_x, textureI.grid_y};
-    int cols = w / textureI.grid_x;
-    int rows = h / textureI.grid_y;
-    int col = frame % cols;
-    int row = frame / cols;
-
-    glm::vec2 frameOffset = {col * frameSize.x, row * frameSize.y};
-    //draw(textureI.textureID, x, y, w, h, scale_x, scale_y, angle, frameOffset, frameSize, 6, VAO_default);
-}
-
-void createVAOnVBO(GLuint& vao, GLuint& vbo) {
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-}
-
 void setViewTranslate(float x, float y) {
     view.x = x; view.y = y;
 }
 
+void setUniformBool(GLuint shader, std::string name, bool value) {
+    if (hasCachedUniformValue(shader, name, UNIFORM_INT, value, 0, 0, 0)) return;
+    setCachedUniform(shader, name, UNIFORM_INT, value, 0, 0, 0);
+    setUniformInt(shader, name, value);
+}
+
 void setUniformInt(GLuint shader, const std::string &name, int value) {
-    glUniform1i(glGetUniformLocation(shader, name.c_str()), value);
-}
-
-void setUniformVec2(GLuint shader, const std::string &name, float x, float y) {
-    glUniform2f(glGetUniformLocation(shader, name.c_str()), x, y);
-}
-
-void setUniformVec3(GLuint shader, const std::string &name, float x, float y, float z) {
-    glUniform3f(glGetUniformLocation(shader, name.c_str()), x, y, z);
-}
-
-void setUniformVec4(GLuint shader, const std::string &name, float x, float y, float z, float w) {
-    glUniform4f(glGetUniformLocation(shader, name.c_str()), x, y, z, w);
+    if (hasCachedUniformValue(shader, name, UNIFORM_INT, value, 0, 0, 0)) return;
+    int location = getUniformLocation(shader, name);
+    if (location == -1) return;
+    setCachedUniform(shader, name, UNIFORM_INT, value, 0, 0, 0);
+    glUniform1i(location, value);
 }
 
 void setUniformFloat(GLuint shader, const std::string &name, float value) {
-    glUniform1f(glGetUniformLocation(shader, name.c_str()), value);
+    if (hasCachedUniformValue(shader, name, UNIFORM_FLOAT, value, 0, 0, 0)) return;
+    int location = getUniformLocation(shader, name);
+    if (location == -1) return;
+    setCachedUniform(shader, name, UNIFORM_FLOAT, value, 0, 0, 0);
+    glUniform1f(location, value);
 }
 
-void setUniformBool(GLuint shader, std::string name, bool v) {
-    setUniformInt(shader, name, v);
+void setUniformVec2(GLuint shader, const std::string &name, float x, float y) {
+    if (hasCachedUniformValue(shader, name, UNIFORM_VEC2, x, y, 0, 0)) return;
+    int location = getUniformLocation(shader, name);
+    if (location == -1) return;
+    setCachedUniform(shader, name, UNIFORM_VEC2, x, y, 0, 0);
+    glUniform2f(location, x, y);
 }
 
-GLuint genShader(GLenum type, const char* shaderCode) {
+void setUniformVec3(GLuint shader, const std::string &name, float x, float y, float z) {
+    if (hasCachedUniformValue(shader, name, UNIFORM_VEC3, x, y, z, 0)) return;
+    int location = getUniformLocation(shader, name);
+    if (location == -1) return;
+    setCachedUniform(shader, name, UNIFORM_VEC3, x, y, z, 0);
+    glUniform3f(location, x, y, z);
+}
+
+void setUniformVec4(GLuint shader, const std::string &name, float x, float y, float z, float w) {
+    if (hasCachedUniformValue(shader, name, UNIFORM_VEC4, x, y, z, w)) return;
+    int location = getUniformLocation(shader, name);
+    if (location == -1) return;
+    setCachedUniform(shader, name, UNIFORM_VEC4, x, y, z, w);
+    glUniform4f(location, x, y, z, w);
+}
+
+
+GLuint loadShaderCode(GLenum type, const char* shaderCode) {
     unsigned int shader;
     char infoLog[1024];
     int success;
@@ -417,16 +463,16 @@ unsigned int createShader(unsigned int ver, unsigned int frag) {
 
 void useShader(unsigned int id) {
     if (currentShader == id) return;
+    flush();
     currentShader = id;
     glUseProgram(id);
-    flush();
 }
 
 void useTexture(unsigned int id) {
     if (currentTexture == id) return;
+    flush();
     currentTexture = id;
     glBindTexture(GL_TEXTURE_2D, id);
-    flush();
 }
 
 void pushShaderID(unsigned int ShaderID) {
@@ -435,34 +481,13 @@ void pushShaderID(unsigned int ShaderID) {
 
 unsigned int loadShader(std::string shader_Path) {
     std::string shaderCode = File::read(shader_Path);
-    GLuint fragID = genShader(GL_FRAGMENT_SHADER, shaderCode.c_str());
+    GLuint fragID = loadShaderCode(GL_FRAGMENT_SHADER, shaderCode.c_str());
     unsigned int result = shaders.size();
     GLuint program = createShader(vertex_default, fragID);
     glDeleteShader(fragID);
     shaders.push_back(program);
     useShader(program);
-    setUniformVec4(program, "uColor", currentColor.r, currentColor.g, currentColor.b, currentColor.a);
     return result;
-}
-
-void draw(GLuint textureID, float x, float y, float tw, float th,int ox, int oy, int ow, int oh, float scale_x, float scale_y, float angle, GLuint vertexCount, GLuint VAO) 
-{
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glBindVertexArray(VAO);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    setUniformVec2(currentShader, "uTextureSize", tw, th);
-    setUniformVec2(currentShader, "uPos", x - (float)windowWidth/2.0f, -y + (float)windowHeight/2.0f);
-    setUniformVec2(currentShader, "uScale", scale_x, scale_y);
-    setUniformFloat(currentShader, "uAngle", angle);
-    setUniformVec4(currentShader, "uRegion", ox, oy, ow, oh);
-    setUniformVec2(currentShader, "uView", view.x, view.y);
-    setUniformVec2(currentShader, "uResolution", windowWidth, windowHeight);
-    
-    glDrawElements(GL_TRIANGLES, vertexCount, GL_UNSIGNED_INT, 0);
-
 }
 
 Quad makeQuad(float cx, float cy, float w, float h, float angle) {
@@ -507,55 +532,59 @@ Quad makeQuad(float cx, float cy, float w, float h, float angle) {
     return q;
 }
 
-void submitSprite(GLuint textureID, GLuint shader, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle)
+void submitSprite(GLuint textureID, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle)
 {
-    if (textureID != currentTexture) flush();
-    useShader(shader);
-    currentTexture = textureID;
+    if (!batching) return;
+    if (batchVertices.size() + 4 > MAX_VERTICES) flush();
 
-    Quad q = makeQuad(x, y, ow * scale_x, oh * scale_y, angle);
-    
+    useTexture(textureID);
+
+    float x0 = -0.5;
+    float y0 = -0.5;
+    float x1 =  0.5;
+    float y1 = -0.5;
+    float x2 =  0.5;
+    float y2 =  0.5;
+    float x3 = -0.5;
+    float y3 =  0.5;
+
     float u0 = ox / tw;
     float v0 = oy / th;
-
     float u1 = (ox + ow) / tw;
     float v1 = oy / th;
-
     float u2 = (ox + ow) / tw;
     float v2 = (oy + oh) / th;
-
     float u3 = ox / tw;
     float v3 = (oy + oh) / th;
 
+    batchInstances.push_back({x, y, angle, scale_x, scale_y, currentColor.r, currentColor.g, currentColor.b, currentColor.a});
+
+    Quad q = makeQuad(x, y, ow * scale_x, oh * scale_y, angle);
     Vertex ver0 = {q.x0, q.y0, u0, v0, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex ver1 = {q.x1, q.y1, u1, v1, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex ver2 = {q.x2, q.y2, u2, v2, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex ver3 = {q.x3, q.y3, u3, v3, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
 
-    unsigned int index = batchVertices.size();
-    batchIndices.push_back(0 + index);
-    batchIndices.push_back(1 + index);
-    batchIndices.push_back(3 + index);
-    batchIndices.push_back(1 + index);
-    batchIndices.push_back(2 + index);
-    batchIndices.push_back(3 + index);
-
     batchVertices.push_back(ver0);
     batchVertices.push_back(ver1);
     batchVertices.push_back(ver2);
     batchVertices.push_back(ver3);
+
 }
 
 void flush()
 {
-    if(batchVertices.empty())
-        return;
+    if(batchVertices.empty()) return;
 
     glBindVertexArray(batchVAO);
-    
-    glBindTexture(GL_TEXTURE_2D, currentTexture);
-
     glBindBuffer(GL_ARRAY_BUFFER, batchVBO);
+
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        MAX_VERTICES * sizeof(Vertex),
+        nullptr,
+        GL_DYNAMIC_DRAW
+    );
 
     glBufferSubData(
         GL_ARRAY_BUFFER,
@@ -564,24 +593,14 @@ void flush()
         batchVertices.data()
     );
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, batchEBO);
-
-    glBufferSubData(
-        GL_ELEMENT_ARRAY_BUFFER,
-        0,
-        batchIndices.size() * sizeof(unsigned int),
-        batchIndices.data()
-    );
-
     glDrawElements(
         GL_TRIANGLES,
-        batchIndices.size(),
+        (batchVertices.size() / 4) * 6,
         GL_UNSIGNED_INT,
         0
     );
 
     batchVertices.clear();
-    batchIndices.clear();
 
     glBindVertexArray(0);
 }
@@ -663,8 +682,7 @@ void drawText(const std::string& text, float x, float y, const std::string& alig
 void createTilemapMesh(int ID, const std::vector<int>& tiles, int W, int H, int Row, int Col, int pixelSize) {
 }
 
-void draw_sprite(TextureRegion& texture_region, float x, float y, float angle, float scale_x, float scale_y) {
-    useShader(defaultShader);
+void drawSprite(TextureRegion& texture_region, float x, float y, float angle, float scale_x, float scale_y) {
     unsigned int textureID = texture_region.get_texture()->get_id();
     int tw = texture_region.get_texture()->get_width();
     int th = texture_region.get_texture()->get_height();
@@ -672,28 +690,27 @@ void draw_sprite(TextureRegion& texture_region, float x, float y, float angle, f
     int oy = texture_region.y;
     int ow = texture_region.w;
     int oh = texture_region.h;
-
-    draw(textureID, x, y, tw, th, ox, oy, ow, oh, scale_x, scale_y, angle, 6, VAO_default);
+    useShader(defaultShader);
+    submitSprite(textureID, x, y, tw, th, ox, oy, ow, oh, scale_x, scale_y, angle);
+    //draw(textureID, x, y, tw, th, ox, oy, ow, oh, scale_x, scale_y, angle, 6, VAO_default);
 }
 
-void draw_rectangle(float x, float y, float w, float h, bool fill) {
-    //useShader(geometryShader);
-    //setUniformInt(geometryShader, "geometry", fill ? 0 : 2);
-    useShader(patchShader);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    setUniformVec2(patchShader, "uResolution", windowWidth, windowHeight);
-    submitSprite(0,patchShader, x, y, w, h, 0, 0, w, h, 1, 1, 0.785398f);
+void drawRectangle(float x, float y, float w, float h, bool fill) {
+    useShader(geometryShader);
+    setUniformInt(geometryShader, "uGeometry", fill ? 0 : 2);
+    setUniformVec2(geometryShader, "uTextureSize", w, h);
+    submitSprite(currentTexture, int(x), int(y), int(w), int(h), 0, 0, int(w), int(h), 1, 1, 0);
     flush();
-    //draw(0, x, y, w, h, 0, 0, w, h, 1, 1, 0, 6, VAO_default);
 }
 
 
 void drawCircle(float x, float y, float r, bool fill){
-    useShader(geometryShader);
-    setUniformInt(geometryShader, "geometry", fill ? 1 : 3);
     float w = r * 2;
     float h = r * 2;
-    draw(0, x, y, w, h, 0, 0, w, h, 1, 1, 0, 6, VAO_default);
+    useShader(geometryShader);
+    setUniformInt(geometryShader, "uGeometry", fill ? 1 : 3);
+    setUniformVec2(geometryShader, "uTextureSize", w, h);
+    submitSprite(currentTexture, int(x), int(y), int(w), int(h), 0, 0, int(w), int(h), 1, 1, 0);
 }
 
 void setShader(unsigned int id) {

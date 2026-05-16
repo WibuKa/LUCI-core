@@ -17,7 +17,9 @@ void update(float deltaTime)
 {
     runTime += deltaTime;
     Lua::update(deltaTime);
+    Render::beginBatch();
     Lua::draw();
+    Render::endBatch();
     Render::setTime(runTime);
 }
 

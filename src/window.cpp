@@ -81,7 +81,8 @@ namespace Window
         glfwSetWindowSizeCallback(window, resize);
 
         Render::init(window);
-        //glfwSwapInterval(0);
+        Render::resize(window_width, window_height);
+        glfwSwapInterval(0);
         return window;
     }
 

@@ -11,7 +11,7 @@
 namespace Time {
     double deltaTime = 0.0;
     double lastFrame = 0.0;
-    const double targetFrameTime = 1.0 / 60.0; // 60 FPS
+    const double targetFrameTime = 0.0; // 60 FPS
 }
 
 int main() {
@@ -41,7 +41,6 @@ int main() {
         Window::update();
         Input::update();
         Game::update(Time::deltaTime);
-
         glfwSwapBuffers(Window::window);
     }
     // Clean Up
