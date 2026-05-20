@@ -31,21 +31,39 @@ namespace Input
         return GLFW_KEY_UNKNOWN;
     }
 
-    bool isKeyDown(const std::string& name)
+    bool isKeyDown(const int& key)
+    {
+        if (key == GLFW_KEY_UNKNOWN) return false;
+        return keyState[key];
+    }
+
+    bool isKeyPress(const int& key)
+    {
+        if (key == GLFW_KEY_UNKNOWN) return false;
+        return keyState[key] && !lastKeyState[key];
+    }
+
+    bool isKeyReleased(const int& key)
+    {
+        if (key == GLFW_KEY_UNKNOWN) return false;
+        return !keyState[key] && lastKeyState[key];
+    }
+
+    bool isKeyboardDown(const std::string& name)
     {
         int key = getKey(name);
         if (key == GLFW_KEY_UNKNOWN) return false;
         return keyState[key];
     }
 
-    bool isKeyPress(const std::string& name)
+    bool isKeyboardPress(const std::string& name)
     {
         int key = getKey(name);
         if (key == GLFW_KEY_UNKNOWN) return false;
         return keyState[key] && !lastKeyState[key];
     }
 
-    bool isKeyReleased(const std::string& name)
+    bool isKeyboardReleased(const std::string& name)
     {
         int key = getKey(name);
         if (key == GLFW_KEY_UNKNOWN) return false;

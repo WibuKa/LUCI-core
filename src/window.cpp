@@ -1,12 +1,21 @@
 #include "window.h"
 #include "renderer.h"
 #include "string"
+#include <iostream>
+
+#define FULLSCREEN_MODE           0
+#define WINDOWED_MODE             1
+#define BORDERLESS_WINDOWED_MODE  2
 
 namespace Window
 {
     GLFWwindow* window        = nullptr;
     std::string window_title  = "";
-    float window_width  = 400, window_height = 300;
+
+    int window_width  = 400, window_height = 300;
+    int window_position_x = 0, window_position_y = 0;
+
+    int window_mode = WINDOWED_MODE;
 
     void resize(GLFWwindow* window, int width, int height){
         Render::resize(width,height);
@@ -35,22 +44,61 @@ namespace Window
         window_title  = tile;
     }
 
-    void fullscreen()
+    void set_fullscreen()
     {
-        const GLFWvidmode* mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+        window_mode = FULLSCREEN_MODE;
 
-        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE); // bỏ border
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
         glfwSetWindowMonitor(
             window,
-            NULL,
+            monitor,
             0,
             0,
             mode->width,
             mode->height,
             mode->refreshRate
         );
-        window_width = mode->width;
-        window_height = mode->height;
+    }
+
+    void set_windowed(int width, int height)
+    {
+        window_mode = WINDOWED_MODE;
+
+        if(width  < 0) width  = 0;
+        if(height < 0) height = 0;
+
+        window_width = width;
+        window_height = height;
+
+        glfwSetWindowMonitor(
+            window,
+            nullptr,
+            window_position_x, 
+            window_position_y, 
+            window_width, 
+            window_height, 
+            GLFW_DONT_CARE
+        );
+    }
+
+    void set_borderless_windowed()
+    {
+        window_mode = BORDERLESS_WINDOWED_MODE; 
+
+        GLFWmonitor* monitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
+
+        glfwSetWindowMonitor(
+            window,
+            nullptr,
+            0,
+            0,
+            mode->width,
+            mode->height,
+            mode->refreshRate
+        );
     }
 
     GLFWwindow* create(){
@@ -79,9 +127,6 @@ namespace Window
         }
         
         glfwSetWindowSizeCallback(window, resize);
-
-        Render::init(window);
-        Render::resize(window_width, window_height);
         glfwSwapInterval(0);
         return window;
     }
@@ -94,10 +139,10 @@ namespace Window
         int win_w, win_h;
         glfwGetWindowSize(window, &win_w, &win_h);
 
-        int pos_x = (mode->width - win_w) / 2;
-        int pos_y = (mode->height - win_h) / 2;
+        window_position_x = (mode->width - win_w) / 2;
+        window_position_y = (mode->height - win_h) / 2;
 
-        glfwSetWindowPos(window, pos_x, pos_y);
+        glfwSetWindowPos(window, window_position_x, window_position_y);
     }
 
     void show(){
@@ -118,5 +163,15 @@ namespace Window
 
     void close(){
         glfwTerminate();
+    }
+
+    int get_width()
+    {
+        return window_width;
+    }
+
+    int get_height()
+    {
+        return window_height;
     }
 }

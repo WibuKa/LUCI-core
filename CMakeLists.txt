@@ -23,6 +23,7 @@ add_executable(game ${SRC_CPP} ${SRC_C})
 # Include
 # =========================
 target_include_directories(game PRIVATE
+     /usr/include/freetype2
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/src
 )

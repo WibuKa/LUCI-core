@@ -16,23 +16,19 @@ void main()
 
 constexpr const char* fragment_font_default_shader = R"(
 #version 330 core
+
+in vec2 UV;
+in vec4 COLOR;
 out vec4 FragColor;
-in vec2 TexCoord;
 
 uniform sampler2D uTexture;
-uniform vec4 uColor;
-
-uniform vec2 uTextureSize;
-uniform vec2 uFrameOffset;
-uniform vec2 uFrameSize;
 
 void main()
 {
-    vec2 frameUV = TexCoord * uFrameSize/uTextureSize + uFrameOffset/uTextureSize;
     float Smoothing = 0.5;
-    float distance = texture(uTexture, frameUV).r;
+    float distance = texture(uTexture, UV).r;
     float alpha = smoothstep(0.5-Smoothing, 0.5+Smoothing, distance);
-    FragColor = vec4(1.0, 1.0, 1.0, alpha) * uColor;
+    FragColor = vec4(1.0, 1.0, 1.0, alpha) * COLOR;
 }
 )";
 

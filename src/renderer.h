@@ -7,9 +7,8 @@
 #include <unordered_map>
 #include <tuple>
 #include <color.h>
-#include "rect.h"
-#include "texture.h"
 #include "texture_region.h"
+#include "font.h"
 
 #define UNIFORM_INT 1
 #define UNIFORM_FLOAT 2
@@ -27,20 +26,12 @@ struct RenderTexture
     int grid_x,grid_y;
 };
 
-
-
 struct Vertex {
     float x, y;
     float u, v;
     float r, g, b, a;
 };
 
-struct Instance {
-    float x, y;
-    float rot;
-    float sx, sy;
-    float r, g, b, a;
-};
 
 struct Quad {
     float x0, y0;
@@ -55,12 +46,11 @@ namespace Render {
 
     extern int windowWidth, windowHeight;
 
-    void init(GLFWwindow* window);
+    void init();
     void resize(int width, int height);
     void setTime(float time);
     void setZoom(float value);
-    void set_font(int id);
-    int load_font(std::string path, int font_size);
+    void setFont(Font font);
 
     unsigned int get_texture_id(const std::string &path);
     bool has_texture(std::string path);
@@ -68,8 +58,7 @@ namespace Render {
     std::tuple<int,int> getWindowSize();
     std::tuple<int,int> getTextureSize(unsigned id);
 
-    unsigned int createTexture(const std::string &path, int grid_x, int grid_y);
-    unsigned int createTexture_data(unsigned char* data, int width, int height, int channel, int grid_x, int grid_y);
+    Texture createTexture(uint8_t* data ,int width, int height, int channel);
 
     void createVAOnVBO(GLuint& vao, GLuint& vbo);
     void createTilemapMesh(int ID, const std::vector<int>& tiles, int W, int H, int Row, int Col, int pixelSize);
@@ -84,7 +73,7 @@ namespace Render {
     );
     void flush();
     //--------------------------------------------------- draw -------------------------------------------------------//
-    void drawText(const std::string& text, float x, float y, const std::string& align);
+    void drawText(const std::string& text,float x,float y,const std::string& align);
     void drawCircle(float x, float y, float r, bool fill);
     void drawSprite(TextureRegion& texture_region, float x, float y, float angle, float scale_x, float scale_y);
     void drawRectangle(float x, float y, float w, float h, bool fill);

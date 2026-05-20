@@ -1,7 +1,6 @@
 #pragma once
 #include <glad/glad.h> 
 #include <GLFW/glfw3.h>
-#include <iostream>
 #include <string>
 
 namespace Window
@@ -15,8 +14,14 @@ namespace Window
     void update();
     void close();
     void center();
+
+    int get_width();
+    int get_height();
+
     //config
     void set_resizable(bool b);
     void set_window(std::string title,int width,int height);
-    void fullscreen();
+    void set_fullscreen();
+    void set_windowed(int width, int height);
+    void set_borderless_windowed();
 }

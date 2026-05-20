@@ -1,6 +1,7 @@
 #pragma once
 
 namespace Game{
-void load();
+void init();
 void update(float deltaTime);
+void draw();
 }

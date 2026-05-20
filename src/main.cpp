@@ -1,47 +1,47 @@
 #include <cstdio>
 #include <glad/glad.h> 
 #include <GLFW/glfw3.h>
-
+#include <iostream>
+#include "system.h"
 #include "window.h"
 #include "audio.h"
-#include "core/input_system.h"
+#include "input_system.h"
 #include "game.h"
 #include "version.h"
-
-namespace Time {
-    double deltaTime = 0.0;
-    double lastFrame = 0.0;
-    const double targetFrameTime = 0.0; // 60 FPS
-}
+#include "timer.h"
+#include "renderer.h"
+#include "loader.h"
 
 int main() {
     std::cout << "-- " << GameEngineName << " " << luciVersion
               << " | " << architecture << "\n";
+    System::init();
     Window::create();
+    Render::init();
     Audio::init();
-    Game::load();
+    Loader::init();
+    Game::init();
     Window::show();
 
-
     while (!Window::isClose()) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        Window::update();
+        Input::update();
+        Game::update(Time::deltaTime);
+        Game::draw();
+        glfwSwapBuffers(Window::window);
+
         double currentTime = glfwGetTime();
         Time::deltaTime = currentTime - Time::lastFrame;
-
         if (Time::deltaTime < Time::targetFrameTime) {
             while ((glfwGetTime() - Time::lastFrame) < Time::targetFrameTime) {
             }
             currentTime = glfwGetTime();
             Time::deltaTime = currentTime - Time::lastFrame;
         }
-
         Time::lastFrame = currentTime;
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        Window::update();
-        Input::update();
-        Game::update(Time::deltaTime);
-        glfwSwapBuffers(Window::window);
     }
     // Clean Up
     Audio::close();

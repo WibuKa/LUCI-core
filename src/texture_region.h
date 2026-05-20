@@ -6,7 +6,7 @@
 
 class TextureRegion {
 private:
-    Texture* texture = nullptr;
+    Texture texture;
 
 public:
     int x = 0;
@@ -16,12 +16,12 @@ public:
     
     TextureRegion() = default;
 
-    TextureRegion(Texture* tex, int x, int y, int w, int h) {
+    TextureRegion(Texture tex, int x, int y, int w, int h) {
         set_texture(tex);
         set_region(x, y, w, h);
     }
 
-    Texture* get_texture(){
+    Texture get_texture(){
         return texture;
     }
 
@@ -29,10 +29,7 @@ public:
         return {x, y, w, h};
     }
     
-    void set_texture(Texture* tex) {
-        if (!tex) {
-            throw std::runtime_error("TextureRegion: texture is null");
-        }
+    void set_texture(Texture tex) {
         texture = tex;
     }
 
@@ -49,7 +46,3 @@ public:
     }
 };
 
-inline TextureRegion new_texture_region(Texture* tex, int x, int y, int w, int h) {
-    printf("new_texture_region\n");
-    return TextureRegion(tex, x, y, w, h);
-}
