@@ -1,9 +1,6 @@
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb/stb_image_write.h>
 #include "helper.h"
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <iostream>
 
 #include <stdlib.h>
 #include "stb/stb_truetype.h" 
@@ -45,33 +42,4 @@ std::vector<uint32_t> string2U32(const std::string& s) {
         }
     }
     return out;
-}
-
-bool saveTextureToPNG(const char* filename, unsigned int textureID, int width, int height, int channels) {
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    glPixelStorei(GL_PACK_ALIGNMENT, 1); 
-
-    std::vector<unsigned char> pixels(width * height * channels);
-
-    GLenum format = (channels == 3) ? GL_RGB : GL_RGBA;
-    glGetTexImage(GL_TEXTURE_2D, 0, format, GL_UNSIGNED_BYTE, pixels.data()); 
-
-    int success = stbi_write_png(
-        filename, 
-        width, 
-        height, 
-        channels, 
-        pixels.data(), 
-        0 
-    );
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    if (success) {
-        std::cout << "Successfully wrote " << filename << std::endl;
-        return true;
-    } else {
-        std::cerr << "Failed to write image " << filename << std::endl;
-        return false;
-    }
 }

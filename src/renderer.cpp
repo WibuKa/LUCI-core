@@ -170,7 +170,7 @@ void init() {
 
     batchVertices.reserve(MAX_VERTICES);
 
-    // ------------------------------------------------------------------------------ //
+    // ------------------------------- load default shaders -------------------------------- //
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -190,6 +190,7 @@ void init() {
     glDeleteShader(fagID);
 
     shaders.assign({spriteShader, geometryShader, fontShader});
+    // ------------------------------------------------------------------------------------- //
     
     currentColor = {1.0, 1.0, 1.0, 1.0};
     defaultShader = spriteShader;
@@ -264,11 +265,11 @@ void setTime(float rt) {
 }
 
 void resize(int width, int height) {
-    if (width % 2 != 0) width++;
+    if (width  % 2 != 0) width++;
     if (height % 2 != 0) height++;
-    glViewport(0, 0, width, height);
     windowWidth  = width;
-    windowHeight = height;
+    windowHeight = height;   
+    glViewport(0, 0, width, height);
     for (GLuint &shader : shaders) {
         useShader(shader);
         setUniformVec2(shader, "uResolution", windowWidth, windowHeight);
@@ -294,7 +295,6 @@ void get_textureSize(unsigned int ID, int& width, int& height) {
 
 unsigned int get_texture_id(const std::string &path) {
     return 0;
-    //return load_texture(path, -1, -1);
 }
 
 std::tuple<int,int> getWindowSize() {
@@ -615,24 +615,30 @@ void drawText(const std::string& text,float x,float y,const std::string& align)
     
     std::vector<uint32_t> codepoints = string2U32(text);
     std::vector<Vertex> vertices;
-    std::vector<float> lineWidths;
+    std::vector<float> lineAdvanceWidths;
     
-    float lineWidth = 0.0f;
+    float lineAdvanceWidth = 0.0f;
     float lineHeight = defaultFont.getLineHeight();
 
-    lineWidths.push_back(0.0f);
-    
+    vertices.reserve(codepoints.size() * 4);
+    lineAdvanceWidths.push_back(0.0f);
+
+    int align_mode = LEFT_AlIGN;
+    if (align == "center") 
+        align_mode = CENTER_ALIGN;
+    if (align == "right") 
+        align_mode = RIGHT_ALIGN;
+
     for (uint32_t c : codepoints)
     {
         if (c == '\n')
         {
-            lineWidths.push_back(0.0f);
-            lineWidth = 0.0f;
+            lineAdvanceWidths.push_back(0.0f);
+            lineAdvanceWidth = 0.0f;
             continue;
         }
-        Glyph glyph = defaultFont.getGlyph(c);
-        lineWidth += glyph.advance;
-        lineWidths.back() = lineWidth;
+        const Glyph& glyph = defaultFont.getGlyph(c);
+        lineAdvanceWidths.back() += glyph.advance;
     }
 
     float cx = 0.0f;
@@ -650,31 +656,32 @@ void drawText(const std::string& text,float x,float y,const std::string& align)
             continue;
         }
 
-        Glyph glyph = defaultFont.getGlyph(c);
+        const Glyph& glyph = defaultFont.getGlyph(c);
         float shift = 0.0f;
 
-        if (align == "center")
-            shift = -lineWidths[lineIndex] * 0.5f;
-        else if (align == "right")
-            shift = -lineWidths[lineIndex];
+        if (align_mode == CENTER_ALIGN)
+            shift = -lineAdvanceWidths[lineIndex] * 0.5f;
+        else if (align_mode == RIGHT_ALIGN)
+            shift = -lineAdvanceWidths[lineIndex];
 
         float x0 = x + cx + glyph.offset_x + shift;
-        float y0 = y + cy + glyph.offset_y;
+        float y0 = y + cy - glyph.offset_y + lineHeight;
+
         float x1 = x0 + glyph.width;
         float y1 = y0;
-        float x2 = x0 + glyph.width;
+        float x2 = x1;
         float y2 = y0 + glyph.height;
         float x3 = x0;
-        float y3 = y0 + glyph.height;
+        float y3 = y2;
 
         float u0 = glyph.u0; 
         float v0 = glyph.v0; 
         float u1 = glyph.u1; 
-        float v1 = glyph.v0; 
-        float u2 = glyph.u1; 
-        float v2 = glyph.v1; 
-        float u3 = glyph.u0; 
-        float v3 = glyph.v1;
+        float v1 = glyph.v1;
+        float u2 = glyph.u2; 
+        float v2 = glyph.v2; 
+        float u3 = glyph.u3; 
+        float v3 = glyph.v3;
 
         float r = currentColor.r;
         float g = currentColor.g;

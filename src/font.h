@@ -1,22 +1,27 @@
 #pragma once
-#include "stb/stb_truetype.h"
 #include <string>
 #include <cstdint>
 #include <memory>
-#include <unordered_map>
+#include <vector>
 #include "texture.h"
+
+#define LEFT_AlIGN   0
+#define CENTER_ALIGN 1
+#define RIGHT_ALIGN  2
 
 struct Glyph
 {
     uint32_t codepoint;
-    int      width;
-    int      height;
+    float    advance;
     float    offset_x;
     float    offset_y;
-    float    advance;
+    float    width;
+    float    height;
 
     float u0, v0;
     float u1, v1;
+    float u2, v2;
+    float u3, v3;
 };
 
 class Font
@@ -33,7 +38,7 @@ private:
     float line_height    = 0.0f;
     float letter_spacing = 0.0f;
 
-    std::shared_ptr<std::unordered_map<uint32_t,Glyph>> glyphs;
+    std::shared_ptr<std::vector<Glyph>> glyphs;
 
 public:
 
@@ -49,7 +54,7 @@ public:
         float line_gap,
         float line_height,
         float letter_spacing,
-        std::shared_ptr<std::unordered_map<uint32_t,Glyph>> glyphs
+        std::shared_ptr<std::vector<Glyph>> glyphs
     )
         : valid(valid),
           path(path),

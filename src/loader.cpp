@@ -1,16 +1,19 @@
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "loader.h"
+#include "stb/stb_image_write.h"
+#include <stb/stb_image.h>
+#include <unordered_map>
 #include <memory>
 #include <iostream>
 #include <string>
-#include <stb/stb_image.h>
-#include <unordered_map>
 #include <vector>
-#include <fstream>
 #include "audio.h"
 #include "system.h"
 #include "texture.h"
 #include "font.h"
 #include "renderer.h"
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 std::unordered_map<std::string, size_t> textures_cache;
 std::vector<Texture> loaded_textures;
@@ -21,7 +24,7 @@ namespace Loader {
     {
         std::vector<std::string> fontNames;
 
-if (System::operatingSystem == WINDOWS_OS)
+        if (System::operatingSystem == WINDOWS_OS)
         {
             fontNames = {
                 "C:/Windows/Fonts/consolas.ttf",
@@ -51,122 +54,164 @@ if (System::operatingSystem == WINDOWS_OS)
             }
         }
 
-        if (!defaultFont.isValid())
-        {
-            defaultFont = loadFont("font.ttf", 16); 
-        }
-
         Render::setFont(defaultFont);
     }
 
-    std::vector<int> getCodepoints(stbtt_fontinfo* font)
+    Font loadFont(const std::string& path, float font_size)
     {
-        std::vector<int> cps;
-        for (int cp = 0x000000; cp <= 0x10FFFF; cp++)
+        FT_Library ft;
+        if (FT_Init_FreeType(&ft))
         {
-            int glyph = stbtt_FindGlyphIndex(font, cp);
-            if (glyph != 0)
-                cps.push_back(cp);
-        }
-        return cps;
-    }
-    
-    Font loadFont(const std::string& path,float font_size)
-    {
-        stbtt_fontinfo fontInfo = {};
-        
-        int font_atlas_width = 1024;
-        int font_atlas_height = 1024;
-        
-        std::ifstream inputStream(path.c_str(), std::ios::binary);
-        if (!inputStream) 
-        {
-            std::cerr << "Failed to open font file: " << path << "\n";
+            std::cerr << "ERROR::FREETYPE: Could not init FreeType Library\n";
             return {};
         }
 
-        inputStream.seekg(0, std::ios::end);
-        size_t pathSize = inputStream.tellg();
-        inputStream.seekg(0, std::ios::beg);
-
-        std::vector<uint8_t> fontDataBuf(pathSize);
-        std::vector<uint8_t> fontAtlasTextureData(font_atlas_width * font_atlas_height, 0);
-        
-        inputStream.read((char*)fontDataBuf.data(), pathSize);
-
-        if (!stbtt_InitFont(&fontInfo, fontDataBuf.data(), 0))
+        FT_Face face;
+        if (FT_New_Face(ft, path.c_str(), 0, &face))
         {
-            std::cerr << "stbtt_InitFont() Failed!\n";
-            return {};
-        } 
-        
-        std::vector<int> codepoints = getCodepoints(&fontInfo);
-        std::vector<stbtt_packedchar> packedChars(codepoints.size());
-
-        stbtt_pack_context ctx;
-        stbtt_PackBegin(&ctx, fontAtlasTextureData.data(), font_atlas_width, font_atlas_height, 0, 1, nullptr);
-        
-
-        stbtt_pack_range range;
-        range.first_unicode_codepoint_in_range   = 0;
-        range.font_size                          = font_size;
-        range.num_chars                          = codepoints.size();
-        range.chardata_for_range                 = packedChars.data();
-        range.array_of_unicode_codepoints        = codepoints.data();
-
-        if (!stbtt_PackFontRanges(&ctx, fontDataBuf.data(), 0, &range, 1))
-        {
-            std::cerr << "Failed to pack font\n";
-            stbtt_PackEnd(&ctx);
+            std::cerr << "ERROR::FREETYPE: Could not load font\n";
+            FT_Done_FreeType(ft);
             return {};
         }
 
-        float scale_for_pixel = stbtt_ScaleForPixelHeight(&fontInfo, font_size);
-        int ascent, descent, line_gap;
-        stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &line_gap);
-        int line_height = (ascent - descent + line_gap) * scale_for_pixel;
-        
-        std::unordered_map<uint32_t, Glyph> glyph_map;
+        FT_Set_Pixel_Sizes(face, 0, (FT_UInt)font_size);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-        for (size_t i = 0; i < codepoints.size(); i++)
+        struct GlyphBitmap 
         {
-            uint32_t c = codepoints[i];
-            const auto& pc = packedChars[i];
+            uint32_t codepoint;
+            float    advance;
+            int      width;
+            int      height;
+            float    offset_x; 
+            float    offset_y;
+            int      atlas_x;
+            int      atlas_y;
+        };
 
-            glyph_map.emplace(c, Glyph{
-                c,
+        std::vector<GlyphBitmap> temp_glyphs;
+        temp_glyphs.reserve(96);
 
-                pc.x1 - pc.x0,
-                pc.y1 - pc.y0,
+        for (unsigned char c = 32; c < 128; c++)
+        {
+            if (FT_Load_Char(face, c, FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT))
+                continue;
 
-                pc.xoff,
-                pc.yoff,
+            GlyphBitmap glyph_bitmap;
+            glyph_bitmap.codepoint = c;
+            glyph_bitmap.width     = (int)face->glyph->bitmap.width;
+            glyph_bitmap.height    = (int)face->glyph->bitmap.rows;
+            glyph_bitmap.offset_x  = (float)face->glyph->bitmap_left;
+            glyph_bitmap.offset_y  = (float)face->glyph->bitmap_top;
+            glyph_bitmap.advance   = (float)face->glyph->advance.x / 64.0f; 
+            glyph_bitmap.atlas_x   = 0;
+            glyph_bitmap.atlas_y   = 0;
 
-                (float)pc.xadvance,
-
-                (float)pc.x0 / font_atlas_width,
-                (float)pc.y0 / font_atlas_height,
-
-                (float)pc.x1 / font_atlas_width,
-                (float)pc.y1 / font_atlas_height
-            });
+            temp_glyphs.push_back(glyph_bitmap);
         }
 
-        stbtt_PackEnd(&ctx);
+        int atlasSize = 512;
+        bool packing_success = false;
+        
+        while (!packing_success)
+        {
+            int penX        = 0;
+            int penY        = 0;
+            int rowHeight   = 0;
+            packing_success = true;
 
-        Texture atlas_texture = Render::createTexture(fontAtlasTextureData.data(), font_atlas_width, font_atlas_height, 1);
+            for (GlyphBitmap& g : temp_glyphs)
+            {
+                if (penX + g.width >= atlasSize) {
+                    penX = 0;
+                    penY += rowHeight;
+                    rowHeight = 0;
+                }
+
+                if (penY + g.height >= atlasSize) {
+                    packing_success = false;
+                    atlasSize *= 2;
+                    break;
+                }
+
+                g.atlas_x = penX;
+                g.atlas_y = penY;
+
+                penX += g.width;
+                rowHeight = std::max(rowHeight, g.height);
+            }
+        }
+        size_t dataSize = (size_t)atlasSize * atlasSize;
+        std::vector<uint8_t> atlasData(dataSize, 0);
+
+        for (const auto& g : temp_glyphs)
+        {
+            if (g.width == 0 || g.height == 0) continue;
+
+            FT_Load_Char(face, g.codepoint, FT_LOAD_RENDER | FT_LOAD_FORCE_AUTOHINT);
+            FT_Bitmap& bitmap = face->glyph->bitmap;
+
+            for (int row = 0; row < g.height; ++row)
+            {
+                for (int col = 0; col < g.width; ++col)
+                {
+                    uint8_t pixelValue = bitmap.buffer[row * bitmap.pitch + col];
+                    size_t destIndex = (size_t)(g.atlas_y + row) * atlasSize + (g.atlas_x + col);
+                    atlasData[destIndex] = pixelValue;
+                }
+            }
+        }
+
+        float ascent      = (float)face->size->metrics.ascender  / 64.0f;
+        float descent     = (float)face->size->metrics.descender / 64.0f;
+        float line_height = (float)face->size->metrics.height    / 64.0f;
+        float line_gap    = line_height - ascent + descent;
+        
+        std::vector<Glyph> glyphs;
+        float fAtlasSize = (float)atlasSize;
+        for (const auto& g : temp_glyphs)
+        {
+            Glyph glyph;
+            glyph.codepoint = g.codepoint;
+            glyph.advance   = g.advance;
+            glyph.offset_x  = g.offset_x; 
+            glyph.offset_y  = g.offset_y;
+            glyph.width     = g.width;
+            glyph.height    = g.height;
+
+            float x_start = (float)g.atlas_x;
+            float y_start = (float)g.atlas_y;
+            float x_end   = (float)(g.atlas_x + g.width);
+            float y_end   = (float)(g.atlas_y + g.height);
+
+            glyph.u0        = x_start / fAtlasSize;
+            glyph.v0        = y_start / fAtlasSize;
+            glyph.u1        = x_end / fAtlasSize;
+            glyph.v1        = y_start / fAtlasSize;
+            glyph.u2        = x_end / fAtlasSize;
+            glyph.v2        = y_end / fAtlasSize;
+            glyph.u3        = x_start / fAtlasSize;
+            glyph.v3        = y_end / fAtlasSize;
+
+            glyphs.push_back(glyph);
+        }
+
+        FT_Done_Face(face);
+        FT_Done_FreeType(ft);
+
+        Texture texture = Render::createTexture(atlasData.data(), atlasSize, atlasSize, 1);
 
         return Font(
-            true,
-            path, 
-            atlas_texture, 
-            1.0,
-            ascent,
-            descent, 
+            true, 
+            path,
+            texture, 
+            1, 
+            ascent, 
+            descent,
             line_gap, 
             line_height, 
-            0.0, 
-            std::make_shared<std::unordered_map<uint32_t,Glyph>>(glyph_map)
+            0,
+            std::make_shared<std::vector<Glyph>>(glyphs)
         );
     }
 

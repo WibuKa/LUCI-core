@@ -43,6 +43,13 @@ pkg_check_modules(LUA REQUIRED lua5.3)
 target_include_directories(game PRIVATE ${LUA_INCLUDE_DIRS})
 target_link_libraries(game PRIVATE ${LUA_LIBRARIES})
 
+# =========================`
+# FreeType
+# =========================
+find_package(Freetype REQUIRED)
+target_include_directories(game PRIVATE ${FREETYPE_INCLUDE_DIRS})
+target_link_libraries(game PRIVATE ${FREETYPE_LIBRARIES})
+
 # =========================
 # Platform specific
 # =========================
