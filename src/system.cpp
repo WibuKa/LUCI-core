@@ -16,17 +16,17 @@ namespace System
 {
     void init()
     {
-        cpuCores = static_cast<int>(std::thread::hardware_concurrency());
         
         #if defined(_WIN32)
             operatingSystem = WINDOWS_OS;
+
         #elif defined(__linux__)
             operatingSystem = LINUX_OS;
         #else
             operatingSystem = UNKNOWN_OS;
         #endif
 
-
+        // Get RAM size
         #if defined(_WIN32)
             MEMORYSTATUSEX status;
             status.dwLength = sizeof(status);
@@ -38,6 +38,17 @@ namespace System
             ramMB =(info.totalram * info.mem_unit)/ (1024ull * 1024ull);
         #else
             ramMB = 0;
+        #endif
+
+        // Get CPU cores
+        cpuCores = static_cast<int>(std::thread::hardware_concurrency());
+        
+        // Enable ANSI escape codes for colored terminal output for windows
+        #if defined(_WIN32)
+            HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+            DWORD dwMode = 0;
+            GetConsoleMode(hOut, &dwMode);
+            SetConsoleMode(hOut, dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         #endif
     }
 }
