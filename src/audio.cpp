@@ -1,7 +1,7 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "audio.h"
 #include "vector"
-#include <iostream>
+#include "delog.h"
 #include <memory>
 
 namespace Audio{
@@ -11,7 +11,7 @@ namespace Audio{
     void init() {
         ma_result res = ma_engine_init(NULL, &engine);
         if (res != MA_SUCCESS) {
-            std::cout << "Engine init failed: " << res << "\n";
+            Delog::msg("Engine init failed: %d", res);
             return;
         }
         ma_engine_start(&engine);
@@ -50,13 +50,13 @@ namespace Audio{
     void emitSound(Sound& sound)
     {
         if(sound.isStream()){
-            printf("Cannot emit music\n");
+            Delog::msg("Cannot emit music");
             return;
         }
 
         auto clone = std::make_unique<ma_sound>();
         if(ma_sound_init_copy(&engine, sound.get(), 0, nullptr, clone.get()) != MA_SUCCESS){
-            printf("Failed to play sound\n");
+            Delog::msg("Failed to play sound");
             return;
         }
         ma_sound_set_volume(clone.get(),sound.getVolume());

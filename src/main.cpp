@@ -1,7 +1,6 @@
-#include <cstdio>
 #include <glad/glad.h> 
 #include <GLFW/glfw3.h>
-#include <iostream>
+#include "delog.h"
 #include "system.h"
 #include "window.h"
 #include "audio.h"
@@ -13,8 +12,7 @@
 #include "loader.h"
 
 int main() {
-    std::cout << "-- " << GameEngineName << " " << luciVersion
-              << " | " << architecture << "\n";
+    Delog::msg("-- %s %s | %s", GameEngineName, luciVersion, architecture);
     System::init();
     Window::create();
     Render::init();

@@ -4,7 +4,7 @@
 #include <stb/stb_image.h>
 #include <unordered_map>
 #include <memory>
-#include <iostream>
+#include "delog.h"
 #include <string>
 #include <vector>
 #include "audio.h"
@@ -62,14 +62,14 @@ namespace Loader {
         FT_Library ft;
         if (FT_Init_FreeType(&ft))
         {
-            std::cerr << "ERROR::FREETYPE: Could not init FreeType Library\n";
+            Delog::error("ERROR::FREETYPE: Could not init FreeType Library");
             return {};
         }
 
         FT_Face face;
         if (FT_New_Face(ft, path.c_str(), 0, &face))
         {
-            std::cerr << "ERROR::FREETYPE: Could not load font\n";
+            Delog::error("ERROR::FREETYPE: Could not load font");
             FT_Done_FreeType(ft);
             return {};
         }
@@ -228,7 +228,7 @@ namespace Loader {
         );
 
         if (result != MA_SUCCESS) {
-            std::cout << "Failed to load sound: " << path << "\n";
+            Delog::msg("Failed to load sound: %s", path.c_str());
             return {};
         }
         return Sound(ptr, path, false);
@@ -247,7 +247,7 @@ namespace Loader {
                 NULL,
                 clone.get()
             ) != MA_SUCCESS){
-                printf("Failed to clone audio\n");
+                Delog::msg("Failed to clone audio");
                 return {};
             }
             return Sound(clone,path,true);
@@ -260,7 +260,7 @@ namespace Loader {
                 nullptr,
                 clone.get()
             ) != MA_SUCCESS){
-                printf("Failed to clone audio\n");
+                Delog::msg("Failed to clone audio");
                 return {};
             }
             return Sound(clone,sound.getPath(),false);
@@ -280,7 +280,7 @@ namespace Loader {
         );
 
         if (result != MA_SUCCESS) {
-            std::cout << "Failed to load music: " << path << "\n";
+            Delog::msg("Failed to load music: %s", path.c_str());
             return {};
         }
 
@@ -307,7 +307,7 @@ namespace Loader {
     }
 
     TextureRegion new_texture_region(Texture& tex, int x, int y, int w, int h) {
-        printf("new_texture_region\n");
+        Delog::msg("new_texture_region");
         return TextureRegion(tex, x, y, w, h);
     }
 }

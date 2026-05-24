@@ -1,6 +1,6 @@
 #pragma once
 #include "texture.h"
-#include <cstdio>
+#include "delog.h"
 #include <stdexcept>
 #include "rect.h"
 
@@ -34,7 +34,7 @@ public:
     }
 
     void set_region(int x, int y, int w, int h) {
-        printf("Region set: x=%d, y=%d, w=%d, h=%d\n", x, y, w, h);
+        Delog::msg("Region set: x=%d, y=%d, w=%d, h=%d", x, y, w, h);
         if (w <= 0 || h <= 0) {
             throw std::runtime_error("TextureRegion: invalid region size");
         }

@@ -1,8 +1,7 @@
 #include "texture_region.h"
 #define STB_IMAGE_IMPLEMENTATION
-#include <cstdio>
 #include <stb/stb_image.h>
-#include <iostream>
+#include "delog.h"
 #include "window.h"
 #include "renderer.h"
 #include "shader_archive.h"
@@ -375,12 +374,12 @@ GLuint loadShaderCode(GLenum type, const char* shaderCode) {
         glGetShaderInfoLog(shader, 1024, NULL, infoLog);
         const char* typeStr = (type == GL_VERTEX_SHADER) ? "VERTEX" : 
                               (type == GL_FRAGMENT_SHADER) ? "FRAGMENT" : "UNKNOWN";
-        std::cerr << "[" << typeStr << "] Shader Compile Error:\n" << infoLog << std::endl;
+        Delog::error("[%s] Shader Compile Error:\n%s", typeStr, infoLog);
         return 0;
     }
     const char* typeStr = (type == GL_VERTEX_SHADER) ? "VERTEX" : 
                           (type == GL_FRAGMENT_SHADER) ? "FRAGMENT" : "UNKNOWN";
-    std::cout << "[" << typeStr << "] Shader compiled successfully" << std::endl;
+    Delog::msg("[%s] Shader compiled successfully", typeStr);
     return shader;
 }
 
@@ -398,12 +397,12 @@ unsigned int createShader(unsigned int ver, unsigned int frag) {
 
     if (!success) {
         glGetProgramInfoLog(ShaderID, 1024, NULL, infoLog);
-        std::cerr << "[PROGRAM] Shader Linking Error:\n"<< infoLog << std::endl;
+        Delog::error("[PROGRAM] Shader Linking Error:\n%s", infoLog);
         glDeleteProgram(ShaderID);
         return 0;
     }
 
-    std::cout << "[PROGRAM] Shader linked successfully" << std::endl;
+    Delog::msg("[PROGRAM] Shader linked successfully");
     return ShaderID;
 }
 

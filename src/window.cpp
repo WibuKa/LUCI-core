@@ -1,7 +1,7 @@
 #include "window.h"
 #include "renderer.h"
 #include "string"
-#include <iostream>
+#include "delog.h"
 
 #define FULLSCREEN_MODE           0
 #define WINDOWED_MODE             1
@@ -103,7 +103,7 @@ namespace Window
 
     GLFWwindow* create(){
         if (!glfwInit()) {
-            std::cerr << "Error: GLFW init failed!\n";
+            Delog::error("Error: GLFW init failed!");
             return nullptr;
         }
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE); 
@@ -115,7 +115,7 @@ namespace Window
         glfwHideWindow(window);
         
         if (!window) {
-            std::cerr << "Failed to create window\n";
+            Delog::error("Failed to create window");
             glfwTerminate();
         }
         
@@ -123,7 +123,7 @@ namespace Window
         glfwMakeContextCurrent(window);
 
         if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-            std::cerr << "Failed to initialize GLAD!\n";
+            Delog::error("Failed to initialize GLAD!");
         }
         
         glfwSetWindowSizeCallback(window, resize);
