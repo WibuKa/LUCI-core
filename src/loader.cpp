@@ -211,7 +211,7 @@ namespace Loader {
         );
     }
 
-    Sound load_sound(std::string path)
+    Sound loadSound(std::string path)
     {
         auto ptr = std::make_shared<ma_sound>();
         ma_result result = ma_sound_init_from_file(
@@ -263,7 +263,7 @@ namespace Loader {
         }
     }
 
-    Sound load_stream(std::string path)
+    Sound loadStream(std::string path)
     {
         auto ptr = std::make_shared<ma_sound>();
         ma_result result = ma_sound_init_from_file(
@@ -285,7 +285,7 @@ namespace Loader {
     }
 
 
-    Texture load_texture(const std::string& path){
+    Texture loadTexture(const std::string& path){
         auto it = textures_cache.find(path);
         if (it != textures_cache.end()) {
             return loaded_textures[it->second];
@@ -302,8 +302,7 @@ namespace Loader {
         return tex;
     }
 
-    TextureRegion new_texture_region(Texture& tex, int x, int y, int w, int h) {
-        Delog::msg("new_texture_region");
+    TextureRegion newTextureRegion(Texture& tex, int x, int y, int w, int h) {
         return TextureRegion(tex, x, y, w, h);
     }
 

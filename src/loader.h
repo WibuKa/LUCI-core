@@ -10,11 +10,11 @@ namespace Loader {
     void init();
 
     Sound cloneSound(Sound& sound);
-    Sound load_sound(std::string path);
-    Sound load_stream(std::string path);
+    Sound loadSound(std::string path);
+    Sound loadStream(std::string path);
 
-    Texture load_texture(const std::string& path);
-    TextureRegion new_texture_region(Texture& tex, int x, int y, int w, int h);
+    Texture loadTexture(const std::string& path);
+    TextureRegion newTextureRegion(Texture& tex, int x, int y, int w, int h);
     
     Font loadFont(const std::string& path,float font_size);
 

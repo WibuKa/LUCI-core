@@ -5,19 +5,35 @@
 #include "model.h"
 #include "texture_region.h"
 #include "delog.h"
+#include <vector>
 
 namespace Game{
 
 unsigned int id;
 float runTime = 0.0;
 Mesh* mesh;
+Texture texture; 
+TextureRegion texture_region;
+
+std::vector<glm::vec2> points;
 
 void init()
 {
     Lua::create();
     Lua::load();
 
+    std::srand(std::time(nullptr));
+
     Model model = Loader::loadModel("cube.gltf");
+    texture = Loader::loadTexture("image.png");
+    texture_region = TextureRegion(texture, 0, 0, texture.getWidth(), texture.getHeight());
+        
+    points.reserve(100000);
+    for (int i = 0; i < 100000; i++)
+    {
+        points.push_back(glm::vec2(std::rand() % 1920, std::rand() % 1080));
+    }
+
     printf("Object count: %d\n", model.getNodeCount());
     model.printRootNode();
     mesh = model.getMesh(0);
@@ -45,6 +61,7 @@ void init()
 void update(float deltaTime)
 {
     runTime += deltaTime;
+    printf("fps: %f\n", 1.0f /deltaTime);
     Lua::update(deltaTime);
 
 }
@@ -53,7 +70,11 @@ void draw()
 {    
     Render::setTime(runTime);
     Render::beginBatch();
-    Render::drawMesh(mesh);
+    for (glm::vec2 &point : points)
+    {
+        Render::drawSprite(texture_region, point.x, point.y, 0, 1, 1);
+    }
+    //Render::drawMesh(mesh);
     Lua::draw();
     Render::endBatch();
 }

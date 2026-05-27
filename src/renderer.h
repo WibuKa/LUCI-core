@@ -12,13 +12,6 @@
 #include "font.h"
 #include "model.h"
 
-#define UNIFORM_INT 1
-#define UNIFORM_FLOAT 2
-#define UNIFORM_VEC2 3
-#define UNIFORM_VEC3 4
-#define UNIFORM_VEC4 5
-#define UNIFORM_MAT4 6
-
 struct GLFWwindow;
 
 struct Quad {
@@ -57,6 +50,7 @@ namespace Render {
         float scale_x, float scale_y, float angle
     );
     void flush();
+    void flush2D();
     //--------------------------------------------------- draw -------------------------------------------------------//
     void drawText(const std::string& text,float x,float y,const std::string& align);
     void drawCircle(float x, float y, float r, bool fill);

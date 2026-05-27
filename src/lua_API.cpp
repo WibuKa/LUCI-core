@@ -42,12 +42,12 @@ namespace Lua{
 
     void loader_API()
     {
-        source.set_function("new_texture_region",&Loader::new_texture_region);
-        source.set_function("load_image",&Loader::load_texture);
+        source.set_function("new_texture_region",&Loader::newTextureRegion);
+        source.set_function("load_image",&Loader::loadTexture);
         source.set_function("clone_audio",&Loader::cloneSound);
         source.set_function("load_shader",&Render::loadShader);
-        source.set_function("load_sound",&Loader::load_sound);   
-        source.set_function("load_music",&Loader::load_stream);
+        source.set_function("load_sound",&Loader::loadSound);   
+        source.set_function("load_music",&Loader::loadStream);
     }
 
     void window_API()

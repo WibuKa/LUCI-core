@@ -1,4 +1,6 @@
+#include <cstdio>
 #include <stb_image.h>
+#include <variant>
 #include "texture.h"
 #include "texture_region.h"
 #include "delog.h"
@@ -10,9 +12,11 @@
 #include "color.h"
 #include "vertex.h"
 
-constexpr int MAX_SPRITES  = 5000;
+constexpr int MAX_SPRITES  = 6000;
 constexpr int MAX_VERTICES = MAX_SPRITES * 4;
 constexpr int MAX_INDICES  = MAX_SPRITES * 6;
+
+using UniformValue = std::variant<int, float, glm::vec2, glm::vec3, glm::vec4, glm::mat4>;
 
 GLFWwindow* window;
 float runTime;
@@ -56,10 +60,9 @@ struct View
 
 struct Uniform
 {
-    unsigned int shader;
+    GLuint shader;
     std::string name;
-    int type;
-    float value[4];
+    UniformValue value;
 };
 
 struct UniformLocation {
@@ -72,9 +75,16 @@ struct RenderQueue2D
 {
     GLuint textureID;
     GLuint shaderID;
-    std::vector<Vertex2D> vertices;
+    std::vector<Uniform> uniforms;
+
+    unsigned int vertexOffset;
+    unsigned int vertexCount;
 };
-std::vector<RenderQueue2D> renderQueue2D;
+
+std::vector<RenderQueue2D> renderQueue2DList;
+std::vector<Vertex2D> vertex2DBuffer;
+
+bool breakQueue2D = false;
 
 namespace Render
 {
@@ -84,7 +94,6 @@ int windowWidth, windowHeight;
 GLuint loadShaderCode(GLenum type,const char* shaderCode);
 unsigned int createShader(unsigned int ver, unsigned int frag);
 
-std::vector<Vertex2D> batchVertices;
 
 bool batching = false;
 
@@ -117,8 +126,9 @@ void init() {
         GL_DYNAMIC_DRAW
     );
 
-    std::vector<unsigned int> staticIndices;
+    vertex2DBuffer.reserve(MAX_VERTICES * 5);
 
+    std::vector<unsigned int> staticIndices;
     staticIndices.reserve(MAX_INDICES);
 
     for (unsigned int i = 0; i < MAX_SPRITES; i++)
@@ -179,8 +189,6 @@ void init() {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    batchVertices.reserve(MAX_VERTICES);
-
     // ------------------------------- load default shaders -------------------------------- //
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -220,27 +228,29 @@ void beginBatch()
 void endBatch()
 {
     batching = false;
-    flush();
+    flush2D();
 }
 
 void setColor(float r, float g, float b, float a) {
     currentColor = {r, g, b, a};
 }
 
-void setCachedUniform(unsigned int shader, std::string name,int type,float x, float y, float z, float w) {
+void invalidateState() {
+    breakQueue2D = true;
+}
+
+
+void setCachedUniform(const GLuint shader,const std::string& name, const UniformValue& value) {
     for (Uniform &uniform : uniformCache) {
-        if (uniform.name == name && uniform.shader == shader && uniform.type == type) {
-            uniform.value[0] = x;
-            uniform.value[1] = y;
-            uniform.value[2] = z;
-            uniform.value[3] = w;
+        if (uniform.name == name && uniform.shader == shader) {
+            uniform.value = value;
             return;
         }
     }
-    uniformCache.push_back({shader,name,type,x,y,z,w});
+    uniformCache.push_back({shader,name,value});
 }
 
-GLint getUniformLocation(GLuint shader, const std::string& name)
+GLint getUniformLocation(const GLuint shader, const std::string& name)
 {
     for (const auto& uniform : uniformLocationCache){
         if (uniform.shader == shader && uniform.name == name){
@@ -252,21 +262,17 @@ GLint getUniformLocation(GLuint shader, const std::string& name)
     return location;
 }
 
-bool hasCachedUniformValue(int shader, std::string name, int type, float x, float y, float z, float w) {
+bool hasCachedUniformValue(const GLuint shader,const std::string& name, const UniformValue& value) {
     for (Uniform &uniform : uniformCache) {
         if (uniform.name     == name && 
             uniform.shader   == shader && 
-            uniform.type     == type &&
-            uniform.value[0] == x &&
-            uniform.value[1] == y &&
-            uniform.value[2] == z &&
-            uniform.value[3] == w
-        ) return true;
+            uniform.value    == value) 
+        return true;
     }
     return false;
 }
 
-bool hasUniform(int shader, std::string name) {
+bool hasUniform(const GLuint shader,const std::string& name) {
     if (getUniformLocation(shader, name) == -1) return false;
     return true;
 }
@@ -309,60 +315,65 @@ void setViewTranslate(float x, float y) {
 }
 
 void setUniformBool(GLuint shader, std::string name, bool value) {
-    if (hasCachedUniformValue(shader, name, UNIFORM_INT, value, 0, 0, 0)) return;
-    setCachedUniform(shader, name, UNIFORM_INT, value, 0, 0, 0);
-    setUniformInt(shader, name, value);
+    setUniformInt(shader, name, static_cast<int>(value));
 }
 
 void setUniformInt(GLuint shader, const std::string &name, int value) {
     int location = getUniformLocation(shader, name);
     if (location == -1) return;
-    if (hasCachedUniformValue(shader, name, UNIFORM_INT, value, 0, 0, 0)) return;
-    flush();
-    setCachedUniform(shader, name, UNIFORM_INT, value, 0, 0, 0);
+    UniformValue uv = value;
+    if (hasCachedUniformValue(shader, name, uv)) return;
+    setCachedUniform(shader, name, uv);
+    breakQueue2D = true;
     glUniform1i(location, value);
 }
 
 void setUniformFloat(GLuint shader, const std::string &name, float value) {
     int location = getUniformLocation(shader, name);
     if (location == -1) return;
-    if (hasCachedUniformValue(shader, name, UNIFORM_FLOAT, value, 0, 0, 0)) return;
-    flush();
-    setCachedUniform(shader, name, UNIFORM_FLOAT, value, 0, 0, 0);
+    UniformValue uv = value;
+    if (hasCachedUniformValue(shader, name, uv)) return;
+    setCachedUniform(shader, name, uv);
+    breakQueue2D = true;
     glUniform1f(location, value);
 }
 
 void setUniformVec2(GLuint shader, const std::string &name, float x, float y) {
     int location = getUniformLocation(shader, name);
     if (location == -1) return;
-    if (hasCachedUniformValue(shader, name, UNIFORM_VEC2, x, y, 0, 0)) return;
-    flush();
-    setCachedUniform(shader, name, UNIFORM_VEC2, x, y, 0, 0);
+    UniformValue uv = glm::vec2(x, y);
+    if (hasCachedUniformValue(shader, name, uv)) return;
+    setCachedUniform(shader, name, uv);
+    breakQueue2D = true;
     glUniform2f(location, x, y);
 }
 
 void setUniformVec3(GLuint shader, const std::string &name, float x, float y, float z) {
     int location = getUniformLocation(shader, name);
     if (location == -1) return;
-    if (hasCachedUniformValue(shader, name, UNIFORM_VEC3, x, y, z, 0)) return;
-    flush();
-    setCachedUniform(shader, name, UNIFORM_VEC3, x, y, z, 0);
+    UniformValue uv = glm::vec3(x, y, z);
+    if (hasCachedUniformValue(shader, name, uv)) return;
+    setCachedUniform(shader, name, uv);
+    breakQueue2D = true;
     glUniform3f(location, x, y, z);
 }
 
 void setUniformVec4(GLuint shader, const std::string &name, float x, float y, float z, float w) {
     int location = getUniformLocation(shader, name);
     if (location == -1) return;
-    if (hasCachedUniformValue(shader, name, UNIFORM_VEC4, x, y, z, w)) return;
-    flush();
-    setCachedUniform(shader, name, UNIFORM_VEC4, x, y, z, w);
+    UniformValue uv = glm::vec4(x, y, z, w);
+    if (hasCachedUniformValue(shader, name, uv)) return;
+    setCachedUniform(shader, name, uv);
+    breakQueue2D = true;
     glUniform4f(location, x, y, z, w);
 }
 
 void setUniformMat4(GLuint shader, const std::string &name, const glm::mat4 &value) {
     int location = getUniformLocation(shader, name);
     if (location == -1) return;
-    flush();
+    if (hasCachedUniformValue(shader, name, value)) return;
+    setCachedUniform(shader, name, value);
+    breakQueue2D = true;
     glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
 }
 
@@ -460,14 +471,14 @@ Texture createTexture(uint8_t* data ,int width, int height, int channel)
 
 void useShader(unsigned int id) {
     if (currentShader == id) return;
-    flush();
+    breakQueue2D = true;
     currentShader = id;
     glUseProgram(id);
 }
 
 void useTexture(unsigned int id) {
     if (currentTexture == id) return;
-    flush();
+    breakQueue2D = true;
     currentTexture = id;
     glBindTexture(GL_TEXTURE_2D, id);
 }
@@ -494,47 +505,58 @@ Quad computeQuadVertices(float cx, float cy, float w, float h, float angle)
     float hw = w * 0.5f;
     float hh = h * 0.5f;
 
-    float lx[4] = {
-        -hw,
-         hw,
-         hw,
-        -hw
-    };
-
-    float ly[4] = {
-        -hh,
-        -hh,
-         hh,
-         hh
-    };
-
     if (angle == 0.0f)
     {
-        q.x0 = lx[0] + cx;
-        q.y0 = ly[0] + cy;
-        q.x1 = lx[1] + cx;
-        q.y1 = ly[1] + cy;
-        q.x2 = lx[2] + cx;
-        q.y2 = ly[2] + cy;
-        q.x3 = lx[3] + cx;
-        q.y3 = ly[3] + cy;
-
+        q.x0 = cx - hw;  q.y0 = cy - hh;
+        q.x1 = cx + hw;  q.y1 = cy - hh;
+        q.x2 = cx + hw;  q.y2 = cy + hh;
+        q.x3 = cx - hw;  q.y3 = cy + hh;
         return q;
     }
 
-    float c = cos(angle);
-    float s = sin(angle);
+    float c = cosf(angle);
+    float s = sinf(angle);
 
-    q.x0 = lx[0] * c - ly[0] * s + cx;
-    q.y0 = lx[0] * s + ly[0] * c + cy;
-    q.x1 = lx[1] * c - ly[1] * s + cx;
-    q.y1 = lx[1] * s + ly[1] * c + cy;
-    q.x2 = lx[2] * c - ly[2] * s + cx;
-    q.y2 = lx[2] * s + ly[2] * c + cy;
-    q.x3 = lx[3] * c - ly[3] * s + cx;
-    q.y3 = lx[3] * s + ly[3] * c + cy;
+    float rotX_cos = hw * c;
+    float rotX_sin = hw * s;
+    float rotY_cos = hh * c;
+    float rotY_sin = hh * s;
+
+    q.x0 = cx - rotX_cos + rotY_sin;
+    q.y0 = cy - rotX_sin - rotY_cos;
+
+    q.x1 = cx + rotX_cos + rotY_sin;
+    q.y1 = cy + rotX_sin - rotY_cos;
+
+    q.x2 = cx + rotX_cos - rotY_sin;
+    q.y2 = cy + rotX_sin + rotY_cos;
+
+    q.x3 = cx - rotX_cos - rotY_sin;
+    q.y3 = cy - rotX_sin + rotY_cos;
 
     return q;
+}
+void updateRenderQueue2D(unsigned int size)
+{
+    unsigned int vertexOffset = vertex2DBuffer.size();
+    unsigned int vertexCount  = size;
+
+    if (renderQueue2DList.empty()) {
+        renderQueue2DList.push_back({currentTexture, currentShader, uniformCache, 0, vertexCount});
+    } 
+    else {
+        auto& lastBatch = renderQueue2DList.back();
+
+        if (!breakQueue2D) {
+            lastBatch.vertexCount += vertexCount;
+        } 
+        else {
+            unsigned int vertexOffset = vertex2DBuffer.size();
+            unsigned int vertexCount  = size;
+            renderQueue2DList.push_back({currentTexture, currentShader, uniformCache, vertexOffset, vertexCount});
+            breakQueue2D = false;
+        }
+    }
 }
 
 void submitSprite(GLuint textureID, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle)
@@ -546,75 +568,75 @@ void submitSprite(GLuint textureID, float x, float y, float tw, float th,float o
     float u0 = ox / tw;
     float v0 = oy / th;
     float u1 = (ox + ow) / tw;
-    float v1 = oy / th;
-    float u2 = (ox + ow) / tw;
+    float v1 = v0;
+    float u2 = u1;
     float v2 = (oy + oh) / th;
-    float u3 = ox / tw;
-    float v3 = (oy + oh) / th;
+    float u3 = u0;
+    float v3 = v2;
 
     Quad q = computeQuadVertices(x, y, ow * scale_x, oh * scale_y, angle);
     Vertex2D ver0 = {q.x0, q.y0, u0, v0, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex2D ver1 = {q.x1, q.y1, u1, v1, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex2D ver2 = {q.x2, q.y2, u2, v2, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex2D ver3 = {q.x3, q.y3, u3, v3, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
-
-    batchVertices.push_back(ver0);
-    batchVertices.push_back(ver1);
-    batchVertices.push_back(ver2);
-    batchVertices.push_back(ver3);
-
-    if (renderQueue2D.empty())
-    {
-        renderQueue2D.push_back({textureID, defaultShader, batchVertices});
-    }
+    
+    updateRenderQueue2D(4);
+    vertex2DBuffer.push_back(ver0);
+    vertex2DBuffer.push_back(ver1);
+    vertex2DBuffer.push_back(ver2);
+    vertex2DBuffer.push_back(ver3);
 }
 
 void submitVertices(GLuint texture_id, const std::vector<Vertex2D>& vertices)
 {
     if (!batching) return;
-    if (batchVertices.size() + vertices.size() > MAX_VERTICES) flush();
-
     useTexture(texture_id);
-
-    for (const Vertex2D& vertex : vertices)
-    {
-        batchVertices.push_back(vertex);
-    }
+    
+    vertex2DBuffer.insert(vertex2DBuffer.end(), vertices.begin(), vertices.end());
 }
 
-void flush()
+void applyUniforms(const std::vector<Uniform>& uniforms) {
+
+}
+
+void flush2D()
 {
-    if(renderQueue2D.empty())
-    {
-        renderQueue2D.push_back({currentTexture, currentShader, batchVertices});
-    }
-
-    return;
-
-    if(batchVertices.empty()) return;
-
+    if (vertex2DBuffer.empty()) return;
     glBindVertexArray(batchVAO);
     glBindBuffer(GL_ARRAY_BUFFER, batchVBO);
 
-    glBufferSubData(
-        GL_ARRAY_BUFFER,
-        0,
-        batchVertices.size() * sizeof(Vertex2D),
-        batchVertices.data()
-    );
+    for (size_t i = 0; i < renderQueue2DList.size(); i++) {
+        RenderQueue2D& renderQueue2D = renderQueue2DList[i];
+        
+        useTexture(renderQueue2D.textureID);
+        useShader(renderQueue2D.shaderID);
+        applyUniforms(renderQueue2D.uniforms);
 
-    glDrawElements(
-        GL_TRIANGLES,
-        (batchVertices.size() / 4) * 6,
-        GL_UNSIGNED_INT,
-        0
-    );
+        unsigned int verticesLeft = renderQueue2D.vertexCount;
+        unsigned int currentVertexOffset = renderQueue2D.vertexOffset;
 
-    batchVertices.clear();
+        while (verticesLeft > 0) {
+            unsigned int batchVerticesCount = std::min(verticesLeft, (unsigned int)MAX_VERTICES);
+            unsigned int batchIndicesCount = (batchVerticesCount / 4) * 6;
 
+            glBufferSubData(
+                GL_ARRAY_BUFFER,
+                0,
+                batchVerticesCount * sizeof(Vertex2D),
+                &vertex2DBuffer[currentVertexOffset]
+            );
+
+            glDrawElements(GL_TRIANGLES, batchIndicesCount, GL_UNSIGNED_INT, 0);
+
+            verticesLeft -= batchVerticesCount;
+            currentVertexOffset += batchVerticesCount;
+        }
+    }
+
+    vertex2DBuffer.clear();
+    renderQueue2DList.clear();
     glBindVertexArray(0);
 }
-
 
 void setFont(Font font) {
     defaultFont = font;
