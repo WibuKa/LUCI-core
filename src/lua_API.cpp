@@ -62,13 +62,6 @@ namespace Lua{
 
     void draw_API()
     {
-        lua.set_function("set_view_translate",&Render::setViewTranslate);
-        lua.set_function("get_window_size",&Render::getWindowSize);
-        lua.set_function("get_texture_size",&Render::getTextureSize);
-        lua.set_function("set_font",&Render::setFont);
-
-        lua.set_function("set_color",&Render::setColor);
-
         lua.new_usertype<Texture>("Texture",
             "width", &Texture::getWidth,
             "height",&Texture::getHeight

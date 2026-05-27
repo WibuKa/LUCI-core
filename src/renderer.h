@@ -2,6 +2,7 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -9,22 +10,16 @@
 #include <color.h>
 #include "texture_region.h"
 #include "font.h"
+#include "model.h"
 
 #define UNIFORM_INT 1
 #define UNIFORM_FLOAT 2
 #define UNIFORM_VEC2 3
 #define UNIFORM_VEC3 4
 #define UNIFORM_VEC4 5
+#define UNIFORM_MAT4 6
 
 struct GLFWwindow;
-
-struct RenderTexture
-{
-    std::string path;
-    GLuint textureID;
-    int width,height;
-    int grid_x,grid_y;
-};
 
 struct Quad {
     float x0, y0;
@@ -45,9 +40,6 @@ namespace Render {
     void setZoom(float value);
     void setFont(Font font);
 
-    unsigned int get_texture_id(const std::string &path);
-    bool has_texture(std::string path);
-    void get_textureSize(unsigned int ID, int& width, int& height);
     std::tuple<int,int> getWindowSize();
     std::tuple<int,int> getTextureSize(unsigned id);
 
@@ -70,7 +62,8 @@ namespace Render {
     void drawCircle(float x, float y, float r, bool fill);
     void drawSprite(TextureRegion& texture_region, float x, float y, float angle, float scale_x, float scale_y);
     void drawRectangle(float x, float y, float w, float h, bool fill);
-    
+    void drawMesh(Mesh* mesh);
+    void drawModel(Model* model);
     //-------------------------------------------------- shader ------------------------------------------------------//
     unsigned int loadShader(std::string shader_Path);
     void useShader(unsigned int ID = 0);

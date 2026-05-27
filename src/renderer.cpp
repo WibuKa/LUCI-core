@@ -1,4 +1,5 @@
 #include <stb_image.h>
+#include "texture.h"
 #include "texture_region.h"
 #include "delog.h"
 #include "window.h"
@@ -24,13 +25,13 @@ std::unordered_map<int, std::pair<GLint, GLenum>> glFormats = {
     {4, {GL_RGBA, GL_RGBA}},
 };
 
-std::vector<RenderTexture> textures;
 GLuint vertex_default;
 std::vector<GLuint> shaders;
 unsigned int targetShader = 3;
 unsigned int spriteShader;
 unsigned int geometryShader;
 unsigned int fontShader;
+unsigned int default3DShader;
 unsigned int tilemapShader;
 unsigned int fontTexture;
 unsigned int shader_target = 3;
@@ -43,7 +44,6 @@ GLuint currentShader  = 0;
 GLuint currentTexture = 0;
 
 std::unordered_map<std::string,unsigned int> pathCache;
-
 
 struct View
 {
@@ -68,6 +68,14 @@ struct UniformLocation {
     GLint location;
 };
 
+struct RenderQueue2D
+{
+    GLuint textureID;
+    GLuint shaderID;
+    std::vector<Vertex2D> vertices;
+};
+std::vector<RenderQueue2D> renderQueue2D;
+
 namespace Render
 {
 
@@ -83,6 +91,10 @@ bool batching = false;
 GLuint batchVAO;
 GLuint batchVBO;
 GLuint batchEBO;
+
+GLuint modelVAO;
+GLuint modelVBO;
+GLuint modelEBO;
 
 std::vector<Uniform> uniformCache;
 std::vector<UniformLocation> uniformLocationCache;
@@ -161,7 +173,7 @@ void init() {
         GL_FALSE,
         sizeof(Vertex2D),
         (void*)(4 * sizeof(float))
-    );
+        );
     glEnableVertexAttribArray(2);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -188,7 +200,12 @@ void init() {
     fontShader = createShader(vertex_default, fagID);
     glDeleteShader(fagID);
 
-    shaders.assign({spriteShader, geometryShader, fontShader});
+    GLuint vertex_default_3d = loadShaderCode(GL_VERTEX_SHADER, ShaderArc::vertex_default_3D_shader);
+    
+    fagID = loadShaderCode(GL_FRAGMENT_SHADER, ShaderArc::fragment_default_3D_shader);
+    default3DShader = createShader(vertex_default_3d, fagID);
+
+    shaders.assign({spriteShader, geometryShader, fontShader, default3DShader});
     // ------------------------------------------------------------------------------------- //
     
     currentColor = {1.0, 1.0, 1.0, 1.0};
@@ -279,31 +296,12 @@ void setZoom(float value) {
     zoom = value;
 }
 
-bool has_texture(std::string path) {
-    for (RenderTexture &tex : textures) {
-        if (tex.path == path) return true;
-    }
-    return false;
-}
-
-void get_textureSize(unsigned int ID, int& width, int& height) {
-    RenderTexture texInfo = textures[ID];
-    width  = texInfo.width;
-    height = texInfo.height;
-}
-
 unsigned int get_texture_id(const std::string &path) {
     return 0;
 }
 
 std::tuple<int,int> getWindowSize() {
     return {windowWidth, windowHeight};
-}
-
-std::tuple<int,int> getTextureSize(unsigned id) {
-    int width = 0, height = 0;
-    if (id) get_textureSize(id, width, height);
-    return {width, height};
 }
 
 void setViewTranslate(float x, float y) {
@@ -361,6 +359,12 @@ void setUniformVec4(GLuint shader, const std::string &name, float x, float y, fl
     glUniform4f(location, x, y, z, w);
 }
 
+void setUniformMat4(GLuint shader, const std::string &name, const glm::mat4 &value) {
+    int location = getUniformLocation(shader, name);
+    if (location == -1) return;
+    flush();
+    glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
+}
 
 GLuint loadShaderCode(GLenum type, const char* shaderCode) {
     unsigned int shader;
@@ -536,8 +540,7 @@ Quad computeQuadVertices(float cx, float cy, float w, float h, float angle)
 void submitSprite(GLuint textureID, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle)
 {
     if (!batching) return;
-    if (batchVertices.size() + 4 > MAX_VERTICES) flush();
-
+    
     useTexture(textureID);
 
     float u0 = ox / tw;
@@ -559,6 +562,11 @@ void submitSprite(GLuint textureID, float x, float y, float tw, float th,float o
     batchVertices.push_back(ver1);
     batchVertices.push_back(ver2);
     batchVertices.push_back(ver3);
+
+    if (renderQueue2D.empty())
+    {
+        renderQueue2D.push_back({textureID, defaultShader, batchVertices});
+    }
 }
 
 void submitVertices(GLuint texture_id, const std::vector<Vertex2D>& vertices)
@@ -576,6 +584,13 @@ void submitVertices(GLuint texture_id, const std::vector<Vertex2D>& vertices)
 
 void flush()
 {
+    if(renderQueue2D.empty())
+    {
+        renderQueue2D.push_back({currentTexture, currentShader, batchVertices});
+    }
+
+    return;
+
     if(batchVertices.empty()) return;
 
     glBindVertexArray(batchVAO);
@@ -600,8 +615,6 @@ void flush()
     glBindVertexArray(0);
 }
 
-void loadFragmentShaderSource(std::string path) {
-}
 
 void setFont(Font font) {
     defaultFont = font;
@@ -723,7 +736,6 @@ void drawRectangle(float x, float y, float w, float h, bool fill) {
     setUniformInt(geometryShader, "uGeometry", fill ? 0 : 2);
     setUniformVec2(geometryShader, "uTextureSize", w, h);
     submitSprite(currentTexture, int(x), int(y), int(w), int(h), 0, 0, int(w), int(h), 1, 1, 0);
-    flush();
 }
 
 
@@ -734,6 +746,39 @@ void drawCircle(float x, float y, float r, bool fill){
     setUniformInt(geometryShader, "uGeometry", fill ? 1 : 3);
     setUniformVec2(geometryShader, "uTextureSize", w, h);
     submitSprite(currentTexture, int(x), int(y), int(w), int(h), 0, 0, int(w), int(h), 1, 1, 0);
+}
+
+void drawMesh(Mesh* mesh){
+    useShader(default3DShader);
+
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+
+    float aspect = (float)windowWidth / (float)windowHeight;
+    glm::mat4 projection = glm::perspective(
+        glm::radians(45.0f),
+        aspect,
+        0.1f,
+        100.0f
+    );
+    
+    glm::mat4 view = glm::lookAt(
+        glm::vec3(0.0f, 0.0f, 8.0f),
+        glm::vec3(0.0f, 0.0f, 1.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f)
+    );
+    
+    glm::mat4 model = glm::mat4(1.0f);
+    
+    glm::mat4 MVP = projection * view * model;
+   
+    setUniformMat4(default3DShader, "uMVP", MVP);
+    
+    glBindVertexArray(mesh->primitives[0].VAO);
+    glDrawElements(GL_TRIANGLES, mesh->primitives[0].indices.size(), GL_UNSIGNED_INT, 0);
+
+    glEnable(GL_BLEND);
+    glDisable(GL_DEPTH_TEST);
 }
 
 void setShader(unsigned int id) {

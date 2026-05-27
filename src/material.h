@@ -1,6 +1,10 @@
 #pragma once
 #include <string>
+#include <vector>
+#include "texture.h"
 
-struct Material {
+class Material {
+public:
     std::string name;
+    std::vector<Texture> textures;
 };

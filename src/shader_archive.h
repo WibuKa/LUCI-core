@@ -132,9 +132,7 @@ void main()
     COLOR = aColor;
 }
 )";
-
-
-constexpr const char* fragment_default_shader_3D = R"(
+constexpr const char* fragment_default_3D_shader = R"(
 #version 330 core
 
 in vec2 UV;
@@ -142,12 +140,12 @@ out vec4 FragColor;
 uniform sampler2D uTexture;
 void main()
 {
-    FragColor = texture(uTexture, UV);
+    FragColor = vec4(1.0, 1.0, 1.0, 1.0);
 }
 
 )";
 
-constexpr const char* vertex_default_shader_3D = R"(
+constexpr const char* vertex_default_3D_shader = R"(
 #version 330 core
 
 layout(location = 0) in vec3 aPos;

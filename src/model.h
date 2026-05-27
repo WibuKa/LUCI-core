@@ -2,6 +2,7 @@
 #include <tiny_gltf.h>
 #include "mesh.h"
 #include "node.h"
+#include "bone.h"
 
 class Model {
 private:

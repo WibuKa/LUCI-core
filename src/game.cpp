@@ -7,9 +7,10 @@
 #include "delog.h"
 
 namespace Game{
-    unsigned int id;
 
+unsigned int id;
 float runTime = 0.0;
+Mesh* mesh;
 
 void init()
 {
@@ -19,7 +20,7 @@ void init()
     Model model = Loader::loadModel("cube.gltf");
     printf("Object count: %d\n", model.getNodeCount());
     model.printRootNode();
-    Mesh* mesh = model.getMesh(0);
+    mesh = model.getMesh(0);
 
     for (Vertex3D& vertex : mesh->primitives[0].vertices)
     {
@@ -52,6 +53,7 @@ void draw()
 {    
     Render::setTime(runTime);
     Render::beginBatch();
+    Render::drawMesh(mesh);
     Lua::draw();
     Render::endBatch();
 }

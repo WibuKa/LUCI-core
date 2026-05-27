@@ -360,6 +360,7 @@ Mesh* Model::buildMesh(unsigned int id)
             primitive.material.name = model.materials[gltfPrimitive.material].name;
         }
 
+        primitive.createBuffer();
         mesh->primitives.push_back(std::move(primitive));
     }
 
