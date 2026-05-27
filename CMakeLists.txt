@@ -51,6 +51,13 @@ target_include_directories(game PRIVATE ${FREETYPE_INCLUDE_DIRS})
 target_link_libraries(game PRIVATE ${FREETYPE_LIBRARIES})
 
 # =========================
+# Assimp
+# =========================
+find_package(assimp REQUIRED)
+target_include_directories(game PRIVATE ${ASSIMP_INCLUDE_DIRS})
+target_link_libraries(game PRIVATE ${ASSIMP_LIBRARIES})
+
+# =========================
 # Platform specific
 # =========================
 if(WIN32)

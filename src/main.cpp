@@ -12,6 +12,7 @@
 #include "loader.h"
 
 int main() {
+
     Delog::msg("-- %s %s | %s", GameEngineName, luciVersion, architecture);
     System::init();
     Window::create();

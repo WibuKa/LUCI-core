@@ -3,7 +3,6 @@
 #include <GLFW/glfw3.h>
 
 #include <stdlib.h>
-#include "stb/stb_truetype.h" 
 
 #include <string>
 #include <vector>

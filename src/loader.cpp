@@ -1,16 +1,12 @@
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "loader.h"
-#include "stb/stb_image_write.h"
-#include <stb/stb_image.h>
+#include <stb_image_write.h>
+#include <stb_image.h>
 #include <unordered_map>
 #include <memory>
+#include "loader.h"
 #include "delog.h"
-#include <string>
-#include <vector>
 #include "audio.h"
 #include "system.h"
 #include "texture.h"
-#include "font.h"
 #include "renderer.h"
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -38,7 +34,7 @@ namespace Loader {
             fontNames = {
                 "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
                 "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-                "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf",
+               "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf",
                 "/usr/share/fonts/truetype/freefont/FreeMono.ttf"
             };
         }
@@ -309,5 +305,23 @@ namespace Loader {
     TextureRegion new_texture_region(Texture& tex, int x, int y, int w, int h) {
         Delog::msg("new_texture_region");
         return TextureRegion(tex, x, y, w, h);
+    }
+
+    Model loadModel(const std::string &path)
+    {
+        tinygltf::TinyGLTF loader;
+        std::string err;
+        std::string warn;
+        tinygltf::Model model;
+
+        bool res = loader.LoadASCIIFromFile(&model, &err, &warn, path.c_str());
+        if (!warn.empty()) Delog::warning("Loader: %s", warn.c_str());
+        if (!err.empty()) Delog::error("Loader: %s", err.c_str());
+        if (!res) 
+            Delog::error("Loader: Failed to load %s", path.c_str());
+        else
+            Delog::msg("Loader: Successfully loaded %s", path.c_str());
+        
+        return Model(model);
     }
 }

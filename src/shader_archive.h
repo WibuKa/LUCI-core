@@ -132,4 +132,45 @@ void main()
     COLOR = aColor;
 }
 )";
+
+
+constexpr const char* fragment_default_shader_3D = R"(
+#version 330 core
+
+in vec2 UV;
+out vec4 FragColor;
+uniform sampler2D uTexture;
+void main()
+{
+    FragColor = texture(uTexture, UV);
+}
+
+)";
+
+constexpr const char* vertex_default_shader_3D = R"(
+#version 330 core
+
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec2 aUV;
+layout(location = 2) in vec3 aNormal;
+layout(location = 4) in ivec4 aBoneIDs;
+layout(location = 5) in vec4 aWeights;
+
+uniform mat4 uMVP;
+
+out vec2 UV;
+out vec3 NORMAL;
+out vec4 BONEIDS;
+out vec4 WEIGHTS;
+
+void main()
+{
+    gl_Position = uMVP * vec4(aPos, 1.0);
+    UV = aUV;
+    NORMAL = aNormal;
+    BONEIDS = aBoneIDs;
+    WEIGHTS = aWeights;
+}
+
+)";
 }

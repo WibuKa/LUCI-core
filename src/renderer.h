@@ -26,13 +26,6 @@ struct RenderTexture
     int grid_x,grid_y;
 };
 
-struct Vertex {
-    float x, y;
-    float u, v;
-    float r, g, b, a;
-};
-
-
 struct Quad {
     float x0, y0;
     float x1, y1;

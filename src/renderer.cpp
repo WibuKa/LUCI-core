@@ -1,6 +1,5 @@
+#include <stb_image.h>
 #include "texture_region.h"
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
 #include "delog.h"
 #include "window.h"
 #include "renderer.h"
@@ -8,6 +7,7 @@
 #include "helper.h"
 #include "file.h"
 #include "color.h"
+#include "vertex.h"
 
 constexpr int MAX_SPRITES  = 5000;
 constexpr int MAX_VERTICES = MAX_SPRITES * 4;
@@ -76,7 +76,7 @@ int windowWidth, windowHeight;
 GLuint loadShaderCode(GLenum type,const char* shaderCode);
 unsigned int createShader(unsigned int ver, unsigned int frag);
 
-std::vector<Vertex> batchVertices;
+std::vector<Vertex2D> batchVertices;
 
 bool batching = false;
 
@@ -100,7 +100,7 @@ void init() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, batchEBO);
     glBufferData(
         GL_ARRAY_BUFFER,
-        MAX_VERTICES * sizeof(Vertex),
+        MAX_VERTICES * sizeof(Vertex2D),
         nullptr,
         GL_DYNAMIC_DRAW
     );
@@ -137,7 +137,7 @@ void init() {
         2,
         GL_FLOAT,
         GL_FALSE,
-        sizeof(Vertex),
+        sizeof(Vertex2D),
         (void*)0
     );
     glEnableVertexAttribArray(0);
@@ -148,7 +148,7 @@ void init() {
         2,
         GL_FLOAT,
         GL_FALSE,
-        sizeof(Vertex),
+        sizeof(Vertex2D),
         (void*)(2 * sizeof(float))
     );
     glEnableVertexAttribArray(1);
@@ -159,7 +159,7 @@ void init() {
         4,
         GL_FLOAT,
         GL_FALSE,
-        sizeof(Vertex),
+        sizeof(Vertex2D),
         (void*)(4 * sizeof(float))
     );
     glEnableVertexAttribArray(2);
@@ -550,10 +550,10 @@ void submitSprite(GLuint textureID, float x, float y, float tw, float th,float o
     float v3 = (oy + oh) / th;
 
     Quad q = computeQuadVertices(x, y, ow * scale_x, oh * scale_y, angle);
-    Vertex ver0 = {q.x0, q.y0, u0, v0, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
-    Vertex ver1 = {q.x1, q.y1, u1, v1, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
-    Vertex ver2 = {q.x2, q.y2, u2, v2, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
-    Vertex ver3 = {q.x3, q.y3, u3, v3, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
+    Vertex2D ver0 = {q.x0, q.y0, u0, v0, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
+    Vertex2D ver1 = {q.x1, q.y1, u1, v1, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
+    Vertex2D ver2 = {q.x2, q.y2, u2, v2, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
+    Vertex2D ver3 = {q.x3, q.y3, u3, v3, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
 
     batchVertices.push_back(ver0);
     batchVertices.push_back(ver1);
@@ -561,14 +561,14 @@ void submitSprite(GLuint textureID, float x, float y, float tw, float th,float o
     batchVertices.push_back(ver3);
 }
 
-void submitVertices(GLuint texture_id, const std::vector<Vertex>& vertices)
+void submitVertices(GLuint texture_id, const std::vector<Vertex2D>& vertices)
 {
     if (!batching) return;
     if (batchVertices.size() + vertices.size() > MAX_VERTICES) flush();
 
     useTexture(texture_id);
 
-    for (const Vertex& vertex : vertices)
+    for (const Vertex2D& vertex : vertices)
     {
         batchVertices.push_back(vertex);
     }
@@ -584,7 +584,7 @@ void flush()
     glBufferSubData(
         GL_ARRAY_BUFFER,
         0,
-        batchVertices.size() * sizeof(Vertex),
+        batchVertices.size() * sizeof(Vertex2D),
         batchVertices.data()
     );
 
@@ -613,7 +613,7 @@ void drawText(const std::string& text,float x,float y,const std::string& align)
     const Texture& texture = defaultFont.getTexture();
     
     std::vector<uint32_t> codepoints = string2U32(text);
-    std::vector<Vertex> vertices;
+    std::vector<Vertex2D> vertices;
     std::vector<float> lineAdvanceWidths;
     
     float lineAdvanceWidth = 0.0f;
@@ -687,10 +687,10 @@ void drawText(const std::string& text,float x,float y,const std::string& align)
         float b = currentColor.b;
         float a = currentColor.a;
 
-        Vertex ver0 = {x0, y0, u0, v0, r, g, b, a};
-        Vertex ver1 = {x1, y1, u1, v1, r, g, b, a};
-        Vertex ver2 = {x2, y2, u2, v2, r, g, b, a};
-        Vertex ver3 = {x3, y3, u3, v3, r, g, b, a};
+        Vertex2D ver0 = {x0, y0, u0, v0, r, g, b, a};
+        Vertex2D ver1 = {x1, y1, u1, v1, r, g, b, a};
+        Vertex2D ver2 = {x2, y2, u2, v2, r, g, b, a};
+        Vertex2D ver3 = {x3, y3, u3, v3, r, g, b, a};
 
         vertices.push_back(ver0);
         vertices.push_back(ver1);
