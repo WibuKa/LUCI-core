@@ -18,5 +18,5 @@ namespace Loader {
     
     Font loadFont(const std::string& path,float font_size);
 
-    Model loadModel(const std::string &path);
+    Model* loadModel(const std::string &path);
 }

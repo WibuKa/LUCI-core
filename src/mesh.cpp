@@ -1,14 +1,11 @@
-#include "primitive.h"
-#include <glad/glad.h>
+#include "mesh.h"
 
-Primitive::~Primitive()
+void Mesh::addPrimitive(Primitive& primitive)
 {
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
+    primitives.push_back(primitive);
 }
 
-void Primitive::createBuffer()
+void Mesh::createBuffer(const std::vector<Vertex3D>& vertices, const std::vector<unsigned int>& indices)
 {
     if (vertices.empty() || indices.empty()) return;
 
@@ -28,21 +25,21 @@ void Primitive::createBuffer()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, position));
     glEnableVertexAttribArray(0);
 
-    // Normal (vec3) - Location 1
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, normal));
+    // TexCoord (vec2) - Location 1
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, texCoord));
     glEnableVertexAttribArray(1);
 
-    // TexCoord (vec2) - Location 2
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, texCoord));
+    // Normal (vec3) - Location 2
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, normal));
     glEnableVertexAttribArray(2);
 
-    // BoneIDs (ivec4) - Location 3
-    glVertexAttribIPointer(3, 4, GL_INT, sizeof(Vertex3D), (void*)offsetof(Vertex3D, boneIDs));
-    glEnableVertexAttribArray(3);
-
-    // Weights (vec4) - Location 4
-    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, weights));
+    // BoneIDs (ivec4) - Location 4
+    glVertexAttribIPointer(4, 4, GL_INT, sizeof(Vertex3D), (void*)offsetof(Vertex3D, boneIDs));
     glEnableVertexAttribArray(4);
+
+    // Weights (vec4) - Location 5
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex3D), (void*)offsetof(Vertex3D, weights));
+    glEnableVertexAttribArray(5);
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);

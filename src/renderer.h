@@ -11,6 +11,7 @@
 #include "texture_region.h"
 #include "font.h"
 #include "model.h"
+#include "camera.h"
 
 struct GLFWwindow;
 
@@ -24,8 +25,52 @@ struct Quad {
 extern std::unordered_map<std::string,unsigned int> pathCache;
 
 namespace Render {
+    struct View
+    {
+        glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
+        glm::vec3 rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+
+        int type = PERSPECTIVE_CAMERA;
+        
+        float fov = 45.0f;
+        float near = 0.1f;
+        float far = 100.0f;
+
+        void applyCamera(Camera* camera)
+        {
+            if (camera->type == PERSPECTIVE_CAMERA)
+            {
+                type = PERSPECTIVE_CAMERA;
+                fov = camera->fov;
+                near = camera->near;
+                far = camera->far;
+            }
+            else if (camera->type == ORTHOGRAPHIC_CAMERA)
+            {
+                type = ORTHOGRAPHIC_CAMERA;
+                fov = 0.0f;
+                near = camera->near;
+                far = camera->far;
+            }
+        }
+
+        glm::mat4 getMat4()
+        {
+            float pitch = glm::radians(rotation.x);
+            float yaw   = glm::radians(rotation.y);
+
+            glm::vec3 front;
+            front.x = cos(pitch) * sin(yaw);
+            front.y = sin(pitch);
+            front.z = cos(pitch) * cos(yaw);
+            front = glm::normalize(front);
+
+            return glm::lookAt(position, position + front, glm::vec3(0.0f, 1.0f, 0.0f));
+        }
+    };
 
     extern int windowWidth, windowHeight;
+    extern View view;
 
     void init();
     void resize(int width, int height);
@@ -49,15 +94,15 @@ namespace Render {
         float ox, float oy, float ow, float oh, 
         float scale_x, float scale_y, float angle
     );
-    void flush();
+    void flush3D();
     void flush2D();
     //--------------------------------------------------- draw -------------------------------------------------------//
     void drawText(const std::string& text,float x,float y,const std::string& align);
     void drawCircle(float x, float y, float r, bool fill);
     void drawSprite(TextureRegion& texture_region, float x, float y, float angle, float scale_x, float scale_y);
     void drawRectangle(float x, float y, float w, float h, bool fill);
-    void drawMesh(Mesh* mesh);
-    void drawModel(Model* model);
+    void drawMesh(Mesh* mesh, const glm::mat4& transform);
+    void drawScene(Model* model, const glm::mat4& transform);
     //-------------------------------------------------- shader ------------------------------------------------------//
     unsigned int loadShader(std::string shader_Path);
     void useShader(unsigned int ID = 0);

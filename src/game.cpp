@@ -11,70 +11,75 @@ namespace Game{
 
 unsigned int id;
 float runTime = 0.0;
-Mesh* mesh;
+Model* model;
+Model* model2;
+Mesh* mesh1;
+Mesh* mesh2;
+Mesh* mesh3;
 Texture texture; 
 TextureRegion texture_region;
 
 std::vector<glm::vec2> points;
 
+float monkey_rot_y = 0.0f;
+
 void init()
 {
     Lua::create();
     Lua::load();
-
+    
+    // ------------------------------------------------------------------------------------- //
     std::srand(std::time(nullptr));
 
-    Model model = Loader::loadModel("cube.gltf");
+    printf("Loading dragon.gltf\n");
+    model = Loader::loadModel("dragon.gltf");
+    model2 = Loader::loadModel("monkey.gltf");
+    printf("Loading dragon.gltf done\n");
     texture = Loader::loadTexture("image.png");
     texture_region = TextureRegion(texture, 0, 0, texture.getWidth(), texture.getHeight());
         
-    points.reserve(100000);
-    for (int i = 0; i < 100000; i++)
-    {
-        points.push_back(glm::vec2(std::rand() % 1920, std::rand() % 1080));
-    }
+    points.reserve(150000);
 
-    printf("Object count: %d\n", model.getNodeCount());
-    model.printRootNode();
-    mesh = model.getMesh(0);
+    printf("Object count: %d\n", model->getNodeCount());
+    model->printRootNode();
 
-    for (Vertex3D& vertex : mesh->primitives[0].vertices)
-    {
-        printf("%f %f %f\n", vertex.position.x, vertex.position.y, vertex.position.z);
-    }
+    mesh1 = model->getMesh(0);
+    mesh2 = model->getMesh(1);
+    mesh3 = model->getMesh(2);
 
-    printf("\n\n\n");
-
-    for (Vertex3D& vertex : mesh->primitives[0].vertices)
-    {
-        printf("BoneIDs: %d %d %d %d\n", vertex.boneIDs.x, vertex.boneIDs.y, vertex.boneIDs.z, vertex.boneIDs.w);
-        printf("Weights: %f %f %f %f\n", vertex.weights.x, vertex.weights.y, vertex.weights.z, vertex.weights.w);
-    }
-
-    for (Bone* bone : model.bones)
+    for (Bone* bone : model->bones)
     {
         printf("Node: %s", bone->node->name.c_str());
         printf("[%d]\n", bone->id);
     }
+
+    Render::view.rotation = glm::vec3(180.0f, 0.0f, 0.0f);
+    Render::view.position = glm::vec3(0.0f, 0.0f, 10.0f);
 }
 
 void update(float deltaTime)
 {
     runTime += deltaTime;
-    printf("fps: %f\n", 1.0f /deltaTime);
+    //spin 
+    monkey_rot_y += deltaTime * 25;
+    if (monkey_rot_y > 360.0f) monkey_rot_y = 0.0f;
+    //printf("fps: %f\n", 1.0f /deltaTime);
     Lua::update(deltaTime);
 
 }
 
 void draw()
-{    
+{
+    //spin
+
     Render::setTime(runTime);
     Render::beginBatch();
-    for (glm::vec2 &point : points)
-    {
-        Render::drawSprite(texture_region, point.x, point.y, 0, 1, 1);
-    }
-    //Render::drawMesh(mesh);
+    glm::mat4 mesh1_transform = glm::mat4(1.0f);
+    mesh1_transform = glm::rotate(mesh1_transform, glm::radians(monkey_rot_y), glm::vec3(0.0f, 1.0f, 0.0f));
+    //Render::drawMesh(mesh1,mesh1_transform);
+    //Render::drawMesh(mesh2,glm::mat4(2.0f));
+    //Render::drawMesh(mesh3,glm::mat4(3.0f));
+    Render::drawScene(model,mesh1_transform);
     Lua::draw();
     Render::endBatch();
 }

@@ -13,6 +13,7 @@
 
 std::unordered_map<std::string, size_t> textures_cache;
 std::vector<Texture> loaded_textures;
+std::vector<std::unique_ptr<Model>> loaded_models;
 
 namespace Loader {
 
@@ -284,7 +285,6 @@ namespace Loader {
  
     }
 
-
     Texture loadTexture(const std::string& path){
         auto it = textures_cache.find(path);
         if (it != textures_cache.end()) {
@@ -306,21 +306,22 @@ namespace Loader {
         return TextureRegion(tex, x, y, w, h);
     }
 
-    Model loadModel(const std::string &path)
+    Model* loadModel(const std::string &path)
     {
         tinygltf::TinyGLTF loader;
         std::string err;
         std::string warn;
-        tinygltf::Model model;
+        tinygltf::Model gltfModel;
 
-        bool res = loader.LoadASCIIFromFile(&model, &err, &warn, path.c_str());
+        bool res = loader.LoadASCIIFromFile(&gltfModel, &err, &warn, path.c_str());
         if (!warn.empty()) Delog::warning("Loader: %s", warn.c_str());
         if (!err.empty()) Delog::error("Loader: %s", err.c_str());
         if (!res) 
             Delog::error("Loader: Failed to load %s", path.c_str());
         else
             Delog::msg("Loader: Successfully loaded %s", path.c_str());
-        
-        return Model(model);
+       
+        loaded_models.push_back(std::make_unique<Model>(gltfModel));
+        return loaded_models.back().get();
     }
 }

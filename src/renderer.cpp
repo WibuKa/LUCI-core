@@ -1,6 +1,9 @@
 #include <cstdio>
 #include <stb_image.h>
 #include <variant>
+#include "glm/fwd.hpp"
+#include "model.h"
+#include "primitive.h"
 #include "texture.h"
 #include "texture_region.h"
 #include "delog.h"
@@ -49,14 +52,7 @@ GLuint currentTexture = 0;
 
 std::unordered_map<std::string,unsigned int> pathCache;
 
-struct View
-{
-    float x = 0;
-    float y = 0;
-    float z = 0;
-    float rotate = 0;
-    float scale = 1;
-} view;
+
 
 struct Uniform
 {
@@ -84,12 +80,24 @@ struct RenderQueue2D
 std::vector<RenderQueue2D> renderQueue2DList;
 std::vector<Vertex2D> vertex2DBuffer;
 
+struct RenderQueue3D
+{
+    Model* scene;
+    glm::mat4 transform;
+    std::vector<Uniform> uniforms;
+};
+std::vector<RenderQueue3D> renderQueue3DList;
+std::vector<Light*> lightQueueList;
+std::vector<glm::vec3> lightPositions;
+
 bool breakQueue2D = false;
+bool breakQueue3D = false;
 
 namespace Render
 {
 
 int windowWidth, windowHeight;
+View view;
 
 GLuint loadShaderCode(GLenum type,const char* shaderCode);
 unsigned int createShader(unsigned int ver, unsigned int frag);
@@ -218,17 +226,30 @@ void init() {
     
     currentColor = {1.0, 1.0, 1.0, 1.0};
     defaultShader = spriteShader;
+    
+    // set uTextures 3D default shader
+    useShader(default3DShader);
+    GLint texturesLoc = glGetUniformLocation(default3DShader, "uTextures");
+    int textures[5] = {0,1,2,3,4};
+    glUniform1iv(texturesLoc, 5, textures);
+
 }
 
 void beginBatch()
 {
+    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+
     batching = true;
 }
 
 void endBatch()
 {
-    batching = false;
+    flush3D();
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
     flush2D();
+    batching = false;
 }
 
 void setColor(float r, float g, float b, float a) {
@@ -237,6 +258,7 @@ void setColor(float r, float g, float b, float a) {
 
 void invalidateState() {
     breakQueue2D = true;
+    breakQueue3D = true;
 }
 
 
@@ -310,10 +332,6 @@ std::tuple<int,int> getWindowSize() {
     return {windowWidth, windowHeight};
 }
 
-void setViewTranslate(float x, float y) {
-    view.x = x; view.y = y;
-}
-
 void setUniformBool(GLuint shader, std::string name, bool value) {
     setUniformInt(shader, name, static_cast<int>(value));
 }
@@ -379,14 +397,14 @@ void setUniformMat4(GLuint shader, const std::string &name, const glm::mat4 &val
 
 GLuint loadShaderCode(GLenum type, const char* shaderCode) {
     unsigned int shader;
-    char infoLog[1024];
+    char infoLog[4096];
     int success;
     shader = glCreateShader(type);
     glShaderSource(shader, 1, &shaderCode, NULL);
     glCompileShader(shader);
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
-        glGetShaderInfoLog(shader, 1024, NULL, infoLog);
+        glGetShaderInfoLog(shader, 4096, NULL, infoLog);
         const char* typeStr = (type == GL_VERTEX_SHADER) ? "VERTEX" : 
                               (type == GL_FRAGMENT_SHADER) ? "FRAGMENT" : "UNKNOWN";
         Delog::error("[%s] Shader Compile Error:\n%s", typeStr, infoLog);
@@ -400,7 +418,7 @@ GLuint loadShaderCode(GLenum type, const char* shaderCode) {
 
 unsigned int createShader(unsigned int ver, unsigned int frag) {
     unsigned int ShaderID;
-    char infoLog[1024];
+    char infoLog[4096];
     int success;
 
     ShaderID = glCreateProgram();
@@ -411,7 +429,7 @@ unsigned int createShader(unsigned int ver, unsigned int frag) {
     glGetProgramiv(ShaderID, GL_LINK_STATUS, &success);
 
     if (!success) {
-        glGetProgramInfoLog(ShaderID, 1024, NULL, infoLog);
+        glGetProgramInfoLog(ShaderID, 4096, NULL, infoLog);
         Delog::error("[PROGRAM] Shader Linking Error:\n%s", infoLog);
         glDeleteProgram(ShaderID);
         return 0;
@@ -536,28 +554,7 @@ Quad computeQuadVertices(float cx, float cy, float w, float h, float angle)
 
     return q;
 }
-void updateRenderQueue2D(unsigned int size)
-{
-    unsigned int vertexOffset = vertex2DBuffer.size();
-    unsigned int vertexCount  = size;
 
-    if (renderQueue2DList.empty()) {
-        renderQueue2DList.push_back({currentTexture, currentShader, uniformCache, 0, vertexCount});
-    } 
-    else {
-        auto& lastBatch = renderQueue2DList.back();
-
-        if (!breakQueue2D) {
-            lastBatch.vertexCount += vertexCount;
-        } 
-        else {
-            unsigned int vertexOffset = vertex2DBuffer.size();
-            unsigned int vertexCount  = size;
-            renderQueue2DList.push_back({currentTexture, currentShader, uniformCache, vertexOffset, vertexCount});
-            breakQueue2D = false;
-        }
-    }
-}
 
 void submitSprite(GLuint textureID, float x, float y, float tw, float th,float ox, float oy, float ow, float oh, float scale_x, float scale_y, float angle)
 {
@@ -579,19 +576,53 @@ void submitSprite(GLuint textureID, float x, float y, float tw, float th,float o
     Vertex2D ver1 = {q.x1, q.y1, u1, v1, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex2D ver2 = {q.x2, q.y2, u2, v2, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
     Vertex2D ver3 = {q.x3, q.y3, u3, v3, currentColor.r, currentColor.g, currentColor.b, currentColor.a};
-    
-    updateRenderQueue2D(4);
+   
+    unsigned int vertexOffset = vertex2DBuffer.size();
+
+    if(renderQueue2DList.empty()){
+            renderQueue2DList.push_back({currentTexture, currentShader, uniformCache, 0, 4});
+    }
+    else{
+        auto& lastBatch = renderQueue2DList.back();
+
+        if(!breakQueue2D){
+            lastBatch.vertexCount += 4;
+        }
+        else{
+            renderQueue2DList.push_back({currentTexture, currentShader, uniformCache, vertexOffset, 4});
+            breakQueue2D = false;
+        }
+    }
+
     vertex2DBuffer.push_back(ver0);
     vertex2DBuffer.push_back(ver1);
     vertex2DBuffer.push_back(ver2);
     vertex2DBuffer.push_back(ver3);
 }
 
-void submitVertices(GLuint texture_id, const std::vector<Vertex2D>& vertices)
+void submit2DVertices(GLuint texture_id, const std::vector<Vertex2D>& vertices)
 {
     if (!batching) return;
     useTexture(texture_id);
-    
+ 
+    unsigned int vertexOffset = vertex2DBuffer.size();
+    unsigned int vertexCount  = vertices.size();
+
+    if(renderQueue2DList.empty()){
+        renderQueue2DList.push_back({currentTexture, currentShader, uniformCache, 0, vertexCount});
+    }
+    else{
+        auto& lastBatch = renderQueue2DList.back();
+
+        if(!breakQueue2D){
+            lastBatch.vertexCount += vertexCount;
+        }
+        else{
+            renderQueue2DList.push_back({currentTexture, currentShader, uniformCache, vertexOffset, vertexCount});
+            breakQueue2D = false;
+        }
+    }   
+
     vertex2DBuffer.insert(vertex2DBuffer.end(), vertices.begin(), vertices.end());
 }
 
@@ -605,31 +636,36 @@ void flush2D()
     glBindVertexArray(batchVAO);
     glBindBuffer(GL_ARRAY_BUFFER, batchVBO);
 
-    for (size_t i = 0; i < renderQueue2DList.size(); i++) {
-        RenderQueue2D& renderQueue2D = renderQueue2DList[i];
-        
-        useTexture(renderQueue2D.textureID);
-        useShader(renderQueue2D.shaderID);
-        applyUniforms(renderQueue2D.uniforms);
+    unsigned int totalVertices = (unsigned int)vertex2DBuffer.size();
+    unsigned int uploadCount = std::min(totalVertices, (unsigned int)MAX_VERTICES);
 
-        unsigned int verticesLeft = renderQueue2D.vertexCount;
-        unsigned int currentVertexOffset = renderQueue2D.vertexOffset;
+    glBufferSubData(GL_ARRAY_BUFFER, 0, uploadCount * sizeof(Vertex2D), vertex2DBuffer.data());
+
+    for (size_t i = 0; i < renderQueue2DList.size(); i++) {
+        RenderQueue2D& entry = renderQueue2DList[i];
+
+        useTexture(entry.textureID);
+        useShader(entry.shaderID);
+        applyUniforms(entry.uniforms);
+
+        unsigned int verticesLeft = entry.vertexCount;
+        unsigned int currentSrcOffset = entry.vertexOffset;
 
         while (verticesLeft > 0) {
-            unsigned int batchVerticesCount = std::min(verticesLeft, (unsigned int)MAX_VERTICES);
-            unsigned int batchIndicesCount = (batchVerticesCount / 4) * 6;
+            unsigned int batchVertices = std::min(verticesLeft, (unsigned int)MAX_VERTICES);
+            unsigned int batchIndices = (batchVertices / 4) * 6;
 
-            glBufferSubData(
-                GL_ARRAY_BUFFER,
-                0,
-                batchVerticesCount * sizeof(Vertex2D),
-                &vertex2DBuffer[currentVertexOffset]
-            );
+            if (currentSrcOffset + batchVertices > uploadCount) {
+                glBufferSubData(GL_ARRAY_BUFFER, 0, batchVertices * sizeof(Vertex2D), &vertex2DBuffer[currentSrcOffset]);
+                glDrawElements(GL_TRIANGLES, batchIndices, GL_UNSIGNED_INT, 0);
+            } else {
+                unsigned int startQuad = currentSrcOffset / 4;
+                unsigned int indexByteOffset = startQuad * 6 * sizeof(unsigned int);
+                glDrawElements(GL_TRIANGLES, batchIndices, GL_UNSIGNED_INT, (void*)(uintptr_t)indexByteOffset);
+            }
 
-            glDrawElements(GL_TRIANGLES, batchIndicesCount, GL_UNSIGNED_INT, 0);
-
-            verticesLeft -= batchVerticesCount;
-            currentVertexOffset += batchVerticesCount;
+            verticesLeft -= batchVertices;
+            currentSrcOffset += batchVertices;
         }
     }
 
@@ -708,24 +744,15 @@ void drawText(const std::string& text,float x,float y,const std::string& align)
         float x3 = x0;
         float y3 = y2;
 
-        float u0 = glyph.u0; 
-        float v0 = glyph.v0; 
-        float u1 = glyph.u1; 
-        float v1 = glyph.v1;
-        float u2 = glyph.u2; 
-        float v2 = glyph.v2; 
-        float u3 = glyph.u3; 
-        float v3 = glyph.v3;
-
         float r = currentColor.r;
         float g = currentColor.g;
         float b = currentColor.b;
         float a = currentColor.a;
 
-        Vertex2D ver0 = {x0, y0, u0, v0, r, g, b, a};
-        Vertex2D ver1 = {x1, y1, u1, v1, r, g, b, a};
-        Vertex2D ver2 = {x2, y2, u2, v2, r, g, b, a};
-        Vertex2D ver3 = {x3, y3, u3, v3, r, g, b, a};
+        Vertex2D ver0 = {x0, y0, glyph.u0, glyph.v0, r, g, b, a};
+        Vertex2D ver1 = {x1, y1, glyph.u1, glyph.v1, r, g, b, a};
+        Vertex2D ver2 = {x2, y2, glyph.u2, glyph.v2, r, g, b, a};
+        Vertex2D ver3 = {x3, y3, glyph.u3, glyph.v3, r, g, b, a};
 
         vertices.push_back(ver0);
         vertices.push_back(ver1);
@@ -735,7 +762,7 @@ void drawText(const std::string& text,float x,float y,const std::string& align)
         cx += glyph.advance + defaultFont.getLetterSpacing();
     }
     
-    submitVertices(1, vertices);
+    submit2DVertices(1, vertices);
 }
 
 void createTilemapMesh(int ID, const std::vector<int>& tiles, int W, int H, int Row, int Col, int pixelSize) {
@@ -770,37 +797,160 @@ void drawCircle(float x, float y, float r, bool fill){
     submitSprite(currentTexture, int(x), int(y), int(w), int(h), 0, 0, int(w), int(h), 1, 1, 0);
 }
 
-void drawMesh(Mesh* mesh){
+void drawScene(Model* model, const glm::mat4& transform){
+
     useShader(default3DShader);
 
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
+    renderQueue3DList.push_back({model, transform, uniformCache});
+    for (Node* node : model->nodes)
+    {
+        glm::mat4 nodeTransform = transform * node->globalTransform;
+        if (node->light)
+        {
+            lightQueueList.push_back(node->light);
+            lightPositions.push_back(nodeTransform[3]);
+        }
+    }
+}
 
-    float aspect = (float)windowWidth / (float)windowHeight;
+void flush3D(){
+    
+    useShader(default3DShader);
+
+    float aspectRatio = (float)windowWidth / (float)windowHeight;
+
+    for (int i = 0; i < lightQueueList.size(); i++)
+    {
+        Light* light = lightQueueList[i];
+        glm::vec3 light_position = lightPositions[i];
+
+        glm::vec3 light_dir = glm::normalize(light->direction);
+
+        std::string base = "uLight[" + std::to_string(i) + "]";
+
+        setUniformInt(default3DShader,   base + ".type", light->type);
+        setUniformVec3(default3DShader,  base + ".position",light_position.x, light_position.y, light_position.z);
+        setUniformFloat(default3DShader, base + ".intensity",light->intensity);
+        setUniformVec3(default3DShader,  base + ".color", light->color.r, light->color.g, light->color.b);
+
+        // Directional light and spot light
+        if (light->type == DIRECTIONAL_LIGHT || light->type == SPOT_LIGHT)
+            setUniformVec3(default3DShader, base + ".direction",light_dir.x, light_dir.y, light_dir.z);
+
+        // point light
+        if (light->type == POINT_LIGHT)
+            setUniformFloat(default3DShader, base + ".distance",light->distance);
+
+        // spot light
+        if (light->type == SPOT_LIGHT){
+            setUniformFloat(default3DShader, base + ".spotAngle", light->spotAngle);
+            setUniformFloat(default3DShader, base + ".spotExponent", light->spotExponent);
+        }
+    }
+    setUniformInt(default3DShader, "uLightCount", lightQueueList.size());
+    
     glm::mat4 projection = glm::perspective(
-        glm::radians(45.0f),
-        aspect,
-        0.1f,
-        100.0f
-    );
+            glm::radians(view.fov),
+            aspectRatio,
+            view.near,
+            view.far
+            );
     
-    glm::mat4 view = glm::lookAt(
-        glm::vec3(0.0f, 0.0f, 8.0f),
-        glm::vec3(0.0f, 0.0f, 1.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f)
-    );
-    
-    glm::mat4 model = glm::mat4(1.0f);
-    
-    glm::mat4 MVP = projection * view * model;
-   
-    setUniformMat4(default3DShader, "uMVP", MVP);
-    
-    glBindVertexArray(mesh->primitives[0].VAO);
-    glDrawElements(GL_TRIANGLES, mesh->primitives[0].indices.size(), GL_UNSIGNED_INT, 0);
+    float pitch = glm::radians(view.rotation.x);
+    float yaw   = glm::radians(view.rotation.y);
 
-    glEnable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
+    glm::vec3 viewFront;
+    viewFront.x = cos(pitch) * sin(yaw);
+    viewFront.y = sin(pitch);
+    viewFront.z = cos(pitch) * cos(yaw);
+
+    viewFront = glm::normalize(viewFront);
+    
+    for (RenderQueue3D& entry : renderQueue3DList)
+    {
+        Model* model = entry.scene;
+        glm::mat4 transform = entry.transform;
+        
+
+        for (Node* node : model->nodes)
+        {
+            if (node->mesh)
+            {
+                setUniformMat4(default3DShader, "uProjection", projection);
+                setUniformMat4(default3DShader, "uView", view.getMat4());
+                setUniformMat4(default3DShader, "uModel", transform * node->globalTransform);
+                setUniformVec3(default3DShader, "uViewPos", view.position.x, view.position.y, view.position.z);
+                setUniformVec3(default3DShader, "uObjectColor", 1.0f, 1.0f, 1.0f);
+
+                Primitive& primitive = node->mesh->primitives[0];
+
+                printf("\n-----primitive-----\n");
+                if (primitive.material.textures[BASE_COLOR_TEXTURE_SLOT].getID() != 0) printf("baseColorTexture\n");
+                if (primitive.material.textures[NORMAL_TEXTURE_SLOT].getID()) printf("normalTexture\n");
+                if (primitive.material.textures[METALLIC_TEXTURE_SLOT].getID()) printf("metallicRoughnessTexture\n");
+                if (primitive.material.textures[OCCLUSION_TEXTURE_SLOT].getID()) printf("occlusionTexture\n");
+                if (primitive.material.textures[EMISSIVE_TEXTURE_SLOT].getID()) printf("emissiveTexture\n\n");
+
+                if (primitive.material.textures[BASE_COLOR_TEXTURE_SLOT].getID() != 0){
+                    glActiveTexture(GL_TEXTURE0);
+                    glBindTexture(GL_TEXTURE_2D, primitive.material.textures[BASE_COLOR_TEXTURE_SLOT].getID());
+                    setUniformBool(default3DShader, "uHasBaseColorMap", true);
+                }
+                else {
+                    setUniformBool(default3DShader, "uHasBaseColorMap", false);
+                }
+
+                if (primitive.material.textures[NORMAL_TEXTURE_SLOT].getID() != 0){
+                    glActiveTexture(GL_TEXTURE1);
+                    glBindTexture(GL_TEXTURE_2D, primitive.material.textures[NORMAL_TEXTURE_SLOT].getID());
+                    setUniformBool(default3DShader, "uHasNormalMap", true);
+                }
+                else {
+                    setUniformBool(default3DShader, "uHasNormalMap", false);
+                }
+
+                if (primitive.material.textures[METALLIC_TEXTURE_SLOT].getID() != 0){
+                    glActiveTexture(GL_TEXTURE2);
+                    glBindTexture(GL_TEXTURE_2D, primitive.material.textures[METALLIC_TEXTURE_SLOT].getID());
+                    setUniformBool(default3DShader, "uHasMetallicMap", true);
+                }
+                else {
+                    setUniformBool(default3DShader, "uHasMetallicMap", false);
+                }
+                
+                if (primitive.material.textures[OCCLUSION_TEXTURE_SLOT].getID() != 0){
+                    glActiveTexture(GL_TEXTURE3);
+                    glBindTexture(GL_TEXTURE_2D, primitive.material.textures[OCCLUSION_TEXTURE_SLOT].getID());
+                    setUniformBool(default3DShader, "uHasOcclusionMap", true);
+                }
+                else {
+                    setUniformBool(default3DShader, "uHasOcclusionMap", false);
+                }
+
+                if (primitive.material.textures[EMISSIVE_TEXTURE_SLOT].getID() != 0){
+                    glActiveTexture(GL_TEXTURE4);
+                    glBindTexture(GL_TEXTURE_2D, primitive.material.textures[EMISSIVE_TEXTURE_SLOT].getID());
+                    setUniformBool(default3DShader, "uHasEmissiveMap", true);
+                }
+                else {
+                    setUniformBool(default3DShader, "uHasEmissiveMap", false);
+                }
+
+                glBindVertexArray(node->mesh->VAO);
+                glDrawElementsBaseVertex(
+                    GL_TRIANGLES, 
+                    primitive.indicesCount, 
+                    GL_UNSIGNED_INT, 
+                    (void*)(primitive.indicesOffset * sizeof(unsigned int)),
+                    primitive.vertexOffset
+                );
+            }
+        }
+    }
+    renderQueue3DList.clear();
+    lightQueueList.clear();
+    lightPositions.clear();
+    glBindVertexArray(0);
 }
 
 void setShader(unsigned int id) {

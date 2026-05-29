@@ -1,12 +1,18 @@
 #include "model.h"
+#include "camera.h"
 #include "delog.h"
+#include "light.h"
+#include "material.h"
+#include <glm/gtc/type_ptr.hpp>
 
 Model::Model(tinygltf::Model gltfModel) : model(std::move(gltfModel))
 {
     rootNode = new Node();
+    buildLights();
+    buildMeshes();
+    buildNodes();
     buildRootNode();
     buildBones();
-    buildMeshes();
 }
 
 Model::~Model()
@@ -39,12 +45,62 @@ Bone* Model::getBone(unsigned int id)
     return bones[id];
 }
 
+Light* Model::getLight(unsigned int id)
+{
+    return lights[id];
+}
+
+Camera* Model::getCamera(unsigned int id)
+{
+    return nullptr;
+}
+
 Node* Model::buildNode(int nodeIndex)
 {
+    const tinygltf::Node& gltfNode = model.nodes[nodeIndex];
     Node* node = new Node();
     
     node->name = model.nodes[nodeIndex].name;
     node->id   = nodeIndex;
+    
+    if (gltfNode.matrix.size() == 16)
+    {
+        node->globalTransform = glm::make_mat4x4(gltfNode.matrix.data());
+    }
+    else
+    {
+        glm::mat4 tra = glm::mat4(1.0f);
+        glm::mat4 rot = glm::mat4(1.0f);
+        glm::mat4 sca = glm::mat4(1.0f);
+        
+        // Translation
+        if (gltfNode.translation.size() == 3) {
+            tra = glm::translate(glm::mat4(1.0f), glm::vec3(gltfNode.translation[0], gltfNode.translation[1], gltfNode.translation[2]));
+        }
+        // Rotation 
+        if (gltfNode.rotation.size() == 4) {
+            glm::quat q = glm::quat(gltfNode.rotation[3], gltfNode.rotation[0], gltfNode.rotation[1], gltfNode.rotation[2]);
+            rot = glm::mat4_cast(q);
+        }
+        // Scale 
+        if (gltfNode.scale.size() == 3) {
+            sca = glm::scale(glm::mat4(1.0f), glm::vec3(gltfNode.scale[0], gltfNode.scale[1], gltfNode.scale[2]));
+        }
+
+        node->globalTransform = tra * rot * sca;
+    }
+
+    if (model.nodes[nodeIndex].mesh >= 0){
+        node->mesh = getMesh(model.nodes[nodeIndex].mesh);
+    }
+
+    if (model.nodes[nodeIndex].camera >= 0)
+        node->camera = getCamera(model.nodes[nodeIndex].camera);
+
+    if (model.nodes[nodeIndex].light >= 0)
+        node->light = getLight(model.nodes[nodeIndex].light);
+   
+
     for (int childIndex : model.nodes[nodeIndex].children){
         Node* child = buildNode(childIndex);
         child->parent = node;
@@ -55,17 +111,20 @@ Node* Model::buildNode(int nodeIndex)
     return node;
 }
 
-void Model::buildRootNode()
+void Model::buildNodes()
 {
-    rootNode->id = UINT_MAX;
-    rootNode->name = "Root";
-    
     nodes.resize(model.nodes.size(),nullptr);
     for (size_t i = 0; i < model.nodes.size(); i++)
     {
         if (nodes[i] == nullptr) buildNode(i);
     }
+}
 
+void Model::buildRootNode()
+{
+    rootNode->id = UINT_MAX;
+    rootNode->name = "Root";
+    
     for (int nodeIndex : model.scenes[0].nodes)
     {
         rootNode->addChild(nodes[nodeIndex]);
@@ -127,6 +186,34 @@ void Model::printRootNode()
     Delog::msg("%s", out.c_str());
 }
 
+Camera* Model::buildCamera(unsigned int id)
+{
+    Camera* camera = new Camera();
+    tinygltf::Camera& gltfCamera = model.cameras[id];
+
+    if (gltfCamera.type == "perspective")
+    {
+        camera->type = PERSPECTIVE_CAMERA;
+        camera->fov  = gltfCamera.perspective.yfov;
+        camera->near = gltfCamera.perspective.znear;
+        camera->far  = gltfCamera.perspective.zfar;
+    }
+    else if (gltfCamera.type == "orthographic")
+    {
+        camera->type = ORTHOGRAPHIC_CAMERA;
+        camera->near = gltfCamera.orthographic.znear;
+        camera->far  = gltfCamera.orthographic.zfar;
+    }
+
+    return camera;
+}
+
+void Model::buildCameras()
+{
+    cameras.resize(model.cameras.size());
+    for (size_t i = 0; i < model.cameras.size(); i++) cameras[i] = buildCamera(i);
+}
+
 Mesh* Model::buildMesh(unsigned int id)
 {
     const tinygltf::Mesh& gltfMesh = model.meshes[id];
@@ -144,10 +231,16 @@ Mesh* Model::buildMesh(unsigned int id)
 
     Mesh* mesh = new Mesh();
     mesh->name = gltfMesh.name;
+
+    std::vector<Vertex3D> verticesBuffer;
+    std::vector<unsigned int> indicesBuffer;
     
     for (const tinygltf::Primitive& gltfPrimitive : gltfMesh.primitives)
     {
         Primitive primitive;
+
+        unsigned int vertexOffset  = 0;
+        unsigned int indicesOffset = 0;
 
         // POSITION //
         auto posIt = gltfPrimitive.attributes.find("POSITION");
@@ -165,7 +258,7 @@ Mesh* Model::buildMesh(unsigned int id)
                 posView.byteOffset +
                 posAccessor.byteOffset
             );
-
+        
         // NORMAL //
         const float* normals = nullptr;
 
@@ -310,26 +403,18 @@ Mesh* Model::buildMesh(unsigned int id)
                         weights[i * 4 + 3]
                     );
             }
-
-            primitive.vertices.push_back(vertex);
+            
+            verticesBuffer.push_back(vertex);
         }
+
+        const tinygltf::Accessor&indexAccessor = model.accessors[gltfPrimitive.indices];
+        const tinygltf::BufferView& indexView  = model.bufferViews[indexAccessor.bufferView];
+        const tinygltf::Buffer& indexBuffer    = model.buffers[indexView.buffer];
 
         // INDICES //
         if (gltfPrimitive.indices >= 0)
         {
-            const tinygltf::Accessor&
-                indexAccessor = model.accessors[gltfPrimitive.indices];
-
-            const tinygltf::BufferView&
-                indexView = model.bufferViews[indexAccessor.bufferView];
-
-            const tinygltf::Buffer&
-                indexBuffer = model.buffers[indexView.buffer];
-
-            const unsigned char* data =
-                indexBuffer.data.data() +
-                indexView.byteOffset +
-                indexAccessor.byteOffset;
+            const unsigned char* data = indexBuffer.data.data() + indexView.byteOffset + indexAccessor.byteOffset;
 
             for (size_t i = 0; i < indexAccessor.count; i++){
                 unsigned int index = 0;
@@ -348,22 +433,104 @@ Mesh* Model::buildMesh(unsigned int id)
                         index = reinterpret_cast<const uint32_t*>(data)[i];
                         break;
                 }
-                primitive.indices.push_back(
-                    index
-                );
+                indicesBuffer.push_back(index);
             }
         }
 
         // MATERIAL //
         if (gltfPrimitive.material >= 0)
         {
+            // MATERIAL NAME
             primitive.material.name = model.materials[gltfPrimitive.material].name;
+            const tinygltf::Material& gltfMaterial = model.materials[gltfPrimitive.material];
+
+            // BASE COLOR
+            if (gltfMaterial.pbrMetallicRoughness.baseColorTexture.index >= 0) {
+                Texture baseColorTexture = Texture();
+                int texIndex = gltfMaterial.pbrMetallicRoughness.baseColorTexture.index;
+                const tinygltf::Image& img = model.images[model.textures[texIndex].source];
+                const unsigned char* pixelData = img.image.data();
+
+                baseColorTexture.name = model.textures[texIndex].name;
+                baseColorTexture.create(pixelData, img.width, img.height, img.component);
+               
+                primitive.material.textures[BASE_COLOR_TEXTURE_SLOT] = baseColorTexture;
+                printf("----------------------------\n");
+                printf("baseColorTexture\n");
+            }
+
+            // NORMAL MAP
+            if (gltfMaterial.normalTexture.index >= 0)
+            {
+                Texture normalTexture = Texture();
+                int texIndex = gltfMaterial.normalTexture.index;
+                const tinygltf::Image& img = model.images[model.textures[texIndex].source];
+                const unsigned char* pixelData = img.image.data();
+
+                normalTexture.name = model.textures[texIndex].name;
+                normalTexture.create(pixelData, img.width, img.height, img.component);
+
+                primitive.material.textures[NORMAL_TEXTURE_SLOT] = normalTexture;
+                printf("normalTexture\n");
+            }
+
+            // METALLIC ROUGHNESS
+            if (gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index >= 0)
+            {
+                Texture metallicRoughnessTexture = Texture();
+                int texIndex = gltfMaterial.pbrMetallicRoughness.metallicRoughnessTexture.index;
+                const tinygltf::Image& img = model.images[model.textures[texIndex].source];
+                const unsigned char* pixelData = img.image.data();
+
+                metallicRoughnessTexture.name = model.textures[texIndex].name;
+                metallicRoughnessTexture.create(pixelData, img.width, img.height, img.component);
+
+                primitive.material.textures[METALLIC_TEXTURE_SLOT] = metallicRoughnessTexture;
+                printf("metallicRoughnessTexture\n");
+            }
+            
+            /*
+            // OCCLUSION
+            if (gltfMaterial.occlusionTexture.index >= 0)
+            {
+                Texture occlusionTexture = Texture();
+                int texIndex = gltfMaterial.occlusionTexture.index;
+                const tinygltf::Image& img = model.images[model.textures[texIndex].source];
+                const unsigned char* pixelData = img.image.data();
+
+                occlusionTexture.name = model.textures[texIndex].name;
+                occlusionTexture.create(pixelData, img.width, img.height, img.component);
+
+                primitive.material.textures[OCCLUSION_TEXTURE_SLOT] = occlusionTexture;
+            }
+
+            // EMISSIVE
+            if (gltfMaterial.emissiveTexture.index >= 0)
+            {
+                Texture emissiveTexture = Texture();
+                int texIndex = gltfMaterial.emissiveTexture.index;
+                const tinygltf::Image& img = model.images[model.textures[texIndex].source];
+                const unsigned char* pixelData = img.image.data();
+
+                emissiveTexture.name = model.textures[texIndex].name;
+                emissiveTexture.create(pixelData, img.width, img.height, img.component);
+
+                primitive.material.textures[EMISSIVE_TEXTURE_SLOT] = emissiveTexture;
+            }
+            */
         }
+        primitive.vertexOffset  = vertexOffset;
+        primitive.vertexCount   = posAccessor.count;
+        primitive.indicesOffset = indicesOffset;
+        primitive.indicesCount  = indexAccessor.count;
 
-        primitive.createBuffer();
-        mesh->primitives.push_back(std::move(primitive));
+        vertexOffset  += posAccessor.count;
+        indicesOffset += indexAccessor.count;
+        
+        mesh->addPrimitive(primitive);
     }
-
+    
+    mesh->createBuffer(verticesBuffer, indicesBuffer);
     return mesh;
 }
 
@@ -371,4 +538,34 @@ void Model::buildMeshes()
 {
     meshes.resize(model.meshes.size());
     for (size_t i = 0; i < model.meshes.size(); i++) meshes[i] = buildMesh(i);
+}
+
+Light* Model::buildLight(unsigned int id)
+{
+    const tinygltf::Light& gltfLight = model.lights[id];
+    Light* light = new Light();
+
+    light->intensity = gltfLight.intensity;
+    light->color = glm::vec3(gltfLight.color[0], gltfLight.color[1], gltfLight.color[2]);
+    
+
+    if (gltfLight.type == "directional")
+        light->type = DIRECTIONAL_LIGHT;
+    else if (gltfLight.type == "point")
+        light->type = POINT_LIGHT;
+    else if (gltfLight.type == "spot")
+        light->type = SPOT_LIGHT;
+
+    if (gltfLight.range <= 0.0f)
+        light->distance = std::sqrt(light->intensity / 0.01f);
+    else
+        light->distance = gltfLight.range;
+
+    return light;
+}
+
+void Model::buildLights()
+{
+    lights.resize(model.lights.size());
+    for (size_t i = 0; i < model.lights.size(); i++) lights[i] = buildLight(i);
 }
