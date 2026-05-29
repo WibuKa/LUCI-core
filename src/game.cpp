@@ -1,8 +1,9 @@
 #include "game.h"
+#include "glm/fwd.hpp"
 #include "loader.h"
 #include "lua_API.h"
 #include "renderer.h"
-#include "model.h"
+#include "scene.h"
 #include "texture_region.h"
 #include "delog.h"
 #include <vector>
@@ -11,8 +12,8 @@ namespace Game{
 
 unsigned int id;
 float runTime = 0.0;
-Model* model;
-Model* model2;
+Scene* scene;
+Scene* scene2;
 Mesh* mesh1;
 Mesh* mesh2;
 Mesh* mesh3;
@@ -32,22 +33,22 @@ void init()
     std::srand(std::time(nullptr));
 
     printf("Loading dragon.gltf\n");
-    model = Loader::loadModel("dragon.gltf");
-    model2 = Loader::loadModel("monkey.gltf");
+    scene = Loader::loadScene("dragon.gltf");
+    scene2 = Loader::loadScene("monkey.gltf");
     printf("Loading dragon.gltf done\n");
     texture = Loader::loadTexture("image.png");
     texture_region = TextureRegion(texture, 0, 0, texture.getWidth(), texture.getHeight());
         
     points.reserve(150000);
 
-    printf("Object count: %d\n", model->getNodeCount());
-    model->printRootNode();
+    printf("Object count: %d\n", scene->getNodeCount());
+    scene->printRootNode();
 
-    mesh1 = model->getMesh(0);
-    mesh2 = model->getMesh(1);
-    mesh3 = model->getMesh(2);
+    mesh1 = scene->getMesh(0);
+    mesh2 = scene->getMesh(1);
+    mesh3 = scene->getMesh(2);
 
-    for (Bone* bone : model->bones)
+    for (Bone* bone : scene->bones)
     {
         printf("Node: %s", bone->node->name.c_str());
         printf("[%d]\n", bone->id);
@@ -75,11 +76,13 @@ void draw()
     Render::setTime(runTime);
     Render::beginBatch();
     glm::mat4 mesh1_transform = glm::mat4(1.0f);
+    mesh1_transform[3] = glm::vec4(3.0f, 0.0f, 0.0f, 1.0f);
     mesh1_transform = glm::rotate(mesh1_transform, glm::radians(monkey_rot_y), glm::vec3(0.0f, 1.0f, 0.0f));
     //Render::drawMesh(mesh1,mesh1_transform);
     //Render::drawMesh(mesh2,glm::mat4(2.0f));
     //Render::drawMesh(mesh3,glm::mat4(3.0f));
-    Render::drawScene(model,mesh1_transform);
+    Render::drawScene(scene,mesh1_transform);
+    Render::drawScene(scene2,glm::mat4(2.0f));
     Lua::draw();
     Render::endBatch();
 }

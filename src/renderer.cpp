@@ -2,7 +2,7 @@
 #include <stb_image.h>
 #include <variant>
 #include "glm/fwd.hpp"
-#include "model.h"
+#include "scene.h"
 #include "primitive.h"
 #include "texture.h"
 #include "texture_region.h"
@@ -82,7 +82,7 @@ std::vector<Vertex2D> vertex2DBuffer;
 
 struct RenderQueue3D
 {
-    Model* scene;
+    Scene* scene;
     glm::mat4 transform;
     std::vector<Uniform> uniforms;
 };
@@ -797,12 +797,12 @@ void drawCircle(float x, float y, float r, bool fill){
     submitSprite(currentTexture, int(x), int(y), int(w), int(h), 0, 0, int(w), int(h), 1, 1, 0);
 }
 
-void drawScene(Model* model, const glm::mat4& transform){
+void drawScene(Scene* scene, const glm::mat4& transform){
 
     useShader(default3DShader);
 
-    renderQueue3DList.push_back({model, transform, uniformCache});
-    for (Node* node : model->nodes)
+    renderQueue3DList.push_back({scene, transform, uniformCache});
+    for (Node* node : scene->nodes)
     {
         glm::mat4 nodeTransform = transform * node->globalTransform;
         if (node->light)
@@ -868,29 +868,23 @@ void flush3D(){
     
     for (RenderQueue3D& entry : renderQueue3DList)
     {
-        Model* model = entry.scene;
+        Scene* scene = entry.scene;
         glm::mat4 transform = entry.transform;
         
 
-        for (Node* node : model->nodes)
+        for (Node* node : scene->nodes)
         {
-            if (node->mesh)
+            if (!node->mesh) continue;
+
+            setUniformMat4(default3DShader, "uProjection", projection);
+            setUniformMat4(default3DShader, "uView", view.getMat4());
+            setUniformMat4(default3DShader, "uModel", transform * node->globalTransform);
+            setUniformVec3(default3DShader, "uViewPos", view.position.x, view.position.y, view.position.z);
+
+            glBindVertexArray(node->mesh->VAO);
+
+            for (Primitive& primitive : node->mesh->primitives)
             {
-                setUniformMat4(default3DShader, "uProjection", projection);
-                setUniformMat4(default3DShader, "uView", view.getMat4());
-                setUniformMat4(default3DShader, "uModel", transform * node->globalTransform);
-                setUniformVec3(default3DShader, "uViewPos", view.position.x, view.position.y, view.position.z);
-                setUniformVec3(default3DShader, "uObjectColor", 1.0f, 1.0f, 1.0f);
-
-                Primitive& primitive = node->mesh->primitives[0];
-
-                printf("\n-----primitive-----\n");
-                if (primitive.material.textures[BASE_COLOR_TEXTURE_SLOT].getID() != 0) printf("baseColorTexture\n");
-                if (primitive.material.textures[NORMAL_TEXTURE_SLOT].getID()) printf("normalTexture\n");
-                if (primitive.material.textures[METALLIC_TEXTURE_SLOT].getID()) printf("metallicRoughnessTexture\n");
-                if (primitive.material.textures[OCCLUSION_TEXTURE_SLOT].getID()) printf("occlusionTexture\n");
-                if (primitive.material.textures[EMISSIVE_TEXTURE_SLOT].getID()) printf("emissiveTexture\n\n");
-
                 if (primitive.material.textures[BASE_COLOR_TEXTURE_SLOT].getID() != 0){
                     glActiveTexture(GL_TEXTURE0);
                     glBindTexture(GL_TEXTURE_2D, primitive.material.textures[BASE_COLOR_TEXTURE_SLOT].getID());
@@ -917,7 +911,7 @@ void flush3D(){
                 else {
                     setUniformBool(default3DShader, "uHasMetallicMap", false);
                 }
-                
+
                 if (primitive.material.textures[OCCLUSION_TEXTURE_SLOT].getID() != 0){
                     glActiveTexture(GL_TEXTURE3);
                     glBindTexture(GL_TEXTURE_2D, primitive.material.textures[OCCLUSION_TEXTURE_SLOT].getID());
@@ -936,7 +930,6 @@ void flush3D(){
                     setUniformBool(default3DShader, "uHasEmissiveMap", false);
                 }
 
-                glBindVertexArray(node->mesh->VAO);
                 glDrawElementsBaseVertex(
                     GL_TRIANGLES, 
                     primitive.indicesCount, 

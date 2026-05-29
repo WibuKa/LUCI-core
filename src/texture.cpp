@@ -1,18 +1,32 @@
 #include "texture.h"
+#include "glad/glad.h"
+
+GLenum channelsToGLFormat(int channels)
+{
+    switch (channels) {
+        case 1: return GL_RED;
+        case 2: return GL_RG;
+        case 3: return GL_RGB;
+        case 4: return GL_RGBA;
+        default: return GL_RGB;
+    }
+}
 
 void Texture::create(const unsigned char* data, int w, int h, int channels)
 {
     glGenTextures(1, &id);
     glBindTexture(GL_TEXTURE_2D, id);
 
+    GLenum format = channelsToGLFormat(channels);
+
     glTexImage2D(
         GL_TEXTURE_2D,
         0,
-        channels == 1 ? GL_RED : GL_RGB,
+        format,
         w,
         h,
         0,
-        channels == 1 ? GL_RED : GL_RGB,
+        format,
         GL_UNSIGNED_BYTE,
         data
     );
@@ -24,5 +38,4 @@ void Texture::create(const unsigned char* data, int w, int h, int channels)
 
     width = w;
     height = h;
-    delete[] data;
 }

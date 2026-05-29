@@ -5,7 +5,7 @@
 #include "node.h"
 #include "bone.h"
 
-class Model {
+class Scene {
 private:
     tinygltf::Model model;
     std::vector<unsigned int> skinBoneOffsets;
@@ -32,8 +32,8 @@ public:
     
     Node* rootNode;
     
-    Model(tinygltf::Model gltfModel);
-    ~Model();
+    Scene(tinygltf::Model gltfModel);
+    ~Scene();
 
     unsigned int getNodeCount();
     unsigned int getMeshCount();

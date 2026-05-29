@@ -3,7 +3,7 @@
 #include "sound.h"
 #include "texture.h"
 #include "texture_region.h"
-#include "model.h"
+#include "scene.h"
 #include "font.h"
 
 namespace Loader {
@@ -18,5 +18,5 @@ namespace Loader {
     
     Font loadFont(const std::string& path,float font_size);
 
-    Model* loadModel(const std::string &path);
+    Scene* loadScene(const std::string &path);
 }

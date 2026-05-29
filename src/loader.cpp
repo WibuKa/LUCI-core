@@ -13,7 +13,7 @@
 
 std::unordered_map<std::string, size_t> textures_cache;
 std::vector<Texture> loaded_textures;
-std::vector<std::unique_ptr<Model>> loaded_models;
+std::vector<std::unique_ptr<Scene>> loaded_scenes;
 
 namespace Loader {
 
@@ -306,7 +306,7 @@ namespace Loader {
         return TextureRegion(tex, x, y, w, h);
     }
 
-    Model* loadModel(const std::string &path)
+    Scene* loadScene(const std::string &path)
     {
         tinygltf::TinyGLTF loader;
         std::string err;
@@ -321,7 +321,7 @@ namespace Loader {
         else
             Delog::msg("Loader: Successfully loaded %s", path.c_str());
        
-        loaded_models.push_back(std::make_unique<Model>(gltfModel));
-        return loaded_models.back().get();
+        loaded_scenes.push_back(std::make_unique<Scene>(gltfModel));
+        return loaded_scenes.back().get();
     }
 }

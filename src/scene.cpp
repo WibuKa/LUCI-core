@@ -1,11 +1,11 @@
-#include "model.h"
+#include "scene.h"
 #include "camera.h"
 #include "delog.h"
 #include "light.h"
 #include "material.h"
 #include <glm/gtc/type_ptr.hpp>
 
-Model::Model(tinygltf::Model gltfModel) : model(std::move(gltfModel))
+Scene::Scene(tinygltf::Model gltfModel) : model(std::move(gltfModel))
 {
     rootNode = new Node();
     buildLights();
@@ -15,47 +15,47 @@ Model::Model(tinygltf::Model gltfModel) : model(std::move(gltfModel))
     buildBones();
 }
 
-Model::~Model()
+Scene::~Scene()
 {
     for (Node* node : nodes)
         delete node;
 }
-unsigned int Model::getNodeCount(){
+unsigned int Scene::getNodeCount(){
     return nodes.size();
 }
-unsigned int Model::getMeshCount(){
+unsigned int Scene::getMeshCount(){
    return meshes.size();
 }
-unsigned int Model::getBoneCount(){
+unsigned int Scene::getBoneCount(){
     return bones.size();
 }
 
-Node* Model::getNode(unsigned int id)
+Node* Scene::getNode(unsigned int id)
 {
     return nodes[id];
 }
 
-Mesh* Model::getMesh(unsigned int id)
+Mesh* Scene::getMesh(unsigned int id)
 {
     return meshes[id];
 }
 
-Bone* Model::getBone(unsigned int id)
+Bone* Scene::getBone(unsigned int id)
 {
     return bones[id];
 }
 
-Light* Model::getLight(unsigned int id)
+Light* Scene::getLight(unsigned int id)
 {
     return lights[id];
 }
 
-Camera* Model::getCamera(unsigned int id)
+Camera* Scene::getCamera(unsigned int id)
 {
     return nullptr;
 }
 
-Node* Model::buildNode(int nodeIndex)
+Node* Scene::buildNode(int nodeIndex)
 {
     const tinygltf::Node& gltfNode = model.nodes[nodeIndex];
     Node* node = new Node();
@@ -111,7 +111,7 @@ Node* Model::buildNode(int nodeIndex)
     return node;
 }
 
-void Model::buildNodes()
+void Scene::buildNodes()
 {
     nodes.resize(model.nodes.size(),nullptr);
     for (size_t i = 0; i < model.nodes.size(); i++)
@@ -120,7 +120,7 @@ void Model::buildNodes()
     }
 }
 
-void Model::buildRootNode()
+void Scene::buildRootNode()
 {
     rootNode->id = UINT_MAX;
     rootNode->name = "Root";
@@ -131,7 +131,7 @@ void Model::buildRootNode()
     }
 }
 
-void Model::buildBones()
+void Scene::buildBones()
 {
     int boneIDCount = 0;
     int skinIDCount = 0;
@@ -159,7 +159,7 @@ void Model::buildBones()
     }
 }
 
-void Model::buildTreeString(Node* node, std::string& out, const std::string& prefix, bool isLast, bool isRoot)
+void Scene::buildTreeString(Node* node, std::string& out, const std::string& prefix, bool isLast, bool isRoot)
 {
     out += prefix;
     out += (isRoot ? "" :(isLast ? "└── " : "├── "));
@@ -179,14 +179,14 @@ void Model::buildTreeString(Node* node, std::string& out, const std::string& pre
     }
 }
 
-void Model::printRootNode()
+void Scene::printRootNode()
 {
     std::string out;
     buildTreeString(rootNode, out, "", true, true);
     Delog::msg("%s", out.c_str());
 }
 
-Camera* Model::buildCamera(unsigned int id)
+Camera* Scene::buildCamera(unsigned int id)
 {
     Camera* camera = new Camera();
     tinygltf::Camera& gltfCamera = model.cameras[id];
@@ -208,13 +208,13 @@ Camera* Model::buildCamera(unsigned int id)
     return camera;
 }
 
-void Model::buildCameras()
+void Scene::buildCameras()
 {
     cameras.resize(model.cameras.size());
     for (size_t i = 0; i < model.cameras.size(); i++) cameras[i] = buildCamera(i);
 }
 
-Mesh* Model::buildMesh(unsigned int id)
+Mesh* Scene::buildMesh(unsigned int id)
 {
     const tinygltf::Mesh& gltfMesh = model.meshes[id];
    
@@ -235,12 +235,12 @@ Mesh* Model::buildMesh(unsigned int id)
     std::vector<Vertex3D> verticesBuffer;
     std::vector<unsigned int> indicesBuffer;
     
+    unsigned int vertexOffset  = 0;
+    unsigned int indicesOffset = 0;
+
     for (const tinygltf::Primitive& gltfPrimitive : gltfMesh.primitives)
     {
         Primitive primitive;
-
-        unsigned int vertexOffset  = 0;
-        unsigned int indicesOffset = 0;
 
         // POSITION //
         auto posIt = gltfPrimitive.attributes.find("POSITION");
@@ -489,7 +489,6 @@ Mesh* Model::buildMesh(unsigned int id)
                 printf("metallicRoughnessTexture\n");
             }
             
-            /*
             // OCCLUSION
             if (gltfMaterial.occlusionTexture.index >= 0)
             {
@@ -497,14 +496,11 @@ Mesh* Model::buildMesh(unsigned int id)
                 int texIndex = gltfMaterial.occlusionTexture.index;
                 const tinygltf::Image& img = model.images[model.textures[texIndex].source];
                 const unsigned char* pixelData = img.image.data();
-
                 occlusionTexture.name = model.textures[texIndex].name;
                 occlusionTexture.create(pixelData, img.width, img.height, img.component);
-
                 primitive.material.textures[OCCLUSION_TEXTURE_SLOT] = occlusionTexture;
             }
 
-            // EMISSIVE
             if (gltfMaterial.emissiveTexture.index >= 0)
             {
                 Texture emissiveTexture = Texture();
@@ -517,7 +513,6 @@ Mesh* Model::buildMesh(unsigned int id)
 
                 primitive.material.textures[EMISSIVE_TEXTURE_SLOT] = emissiveTexture;
             }
-            */
         }
         primitive.vertexOffset  = vertexOffset;
         primitive.vertexCount   = posAccessor.count;
@@ -534,13 +529,13 @@ Mesh* Model::buildMesh(unsigned int id)
     return mesh;
 }
 
-void Model::buildMeshes()
+void Scene::buildMeshes()
 {
     meshes.resize(model.meshes.size());
     for (size_t i = 0; i < model.meshes.size(); i++) meshes[i] = buildMesh(i);
 }
 
-Light* Model::buildLight(unsigned int id)
+Light* Scene::buildLight(unsigned int id)
 {
     const tinygltf::Light& gltfLight = model.lights[id];
     Light* light = new Light();
@@ -564,7 +559,7 @@ Light* Model::buildLight(unsigned int id)
     return light;
 }
 
-void Model::buildLights()
+void Scene::buildLights()
 {
     lights.resize(model.lights.size());
     for (size_t i = 0; i < model.lights.size(); i++) lights[i] = buildLight(i);

@@ -10,7 +10,7 @@
 #include <color.h>
 #include "texture_region.h"
 #include "font.h"
-#include "model.h"
+#include "scene.h"
 #include "camera.h"
 
 struct GLFWwindow;
@@ -102,7 +102,7 @@ namespace Render {
     void drawSprite(TextureRegion& texture_region, float x, float y, float angle, float scale_x, float scale_y);
     void drawRectangle(float x, float y, float w, float h, bool fill);
     void drawMesh(Mesh* mesh, const glm::mat4& transform);
-    void drawScene(Model* model, const glm::mat4& transform);
+    void drawScene(Scene* scene, const glm::mat4& transform);
     //-------------------------------------------------- shader ------------------------------------------------------//
     unsigned int loadShader(std::string shader_Path);
     void useShader(unsigned int ID = 0);
